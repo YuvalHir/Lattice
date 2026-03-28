@@ -1,6 +1,6 @@
-# AgentIDE
+# Lattice
 
-AgentIDE is a high-performance, multiplexed orchestration environment designed for managing parallel swarms of AI coding agents. Built with Tauri v2, SolidJS, and Rust, it provides a unified, low-latency interface for deploying and resizing multiple CLI-based agents (like Gemini, Claude, Codex, and OpenCode) in a synchronized workspace.
+Lattice is a high-performance, multiplexed orchestration environment designed for managing parallel swarms of AI coding agents. Built with Tauri v2, SolidJS, and Rust, it provides a unified, low-latency interface for deploying and resizing multiple CLI-based agents (like Gemini, Claude, Codex, and OpenCode) in a synchronized workspace.
 
 ## 🚀 Key Features
 
@@ -30,8 +30,8 @@ AgentIDE is a high-performance, multiplexed orchestration environment designed f
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-repo/agenticide.git
-   cd agenticide
+   git clone https://github.com/YuvalHir/Lattice.git
+   cd Lattice
    ```
 
 2. Install frontend dependencies:
@@ -50,16 +50,16 @@ AgentIDE is a high-performance, multiplexed orchestration environment designed f
 2. **Select Directory**: Use the native folder picker to choose your project root.
 3. **Configure Agents**: Use the quick presets (4, 6, 8, 12) or manually adjust the count of Gemini, Claude, or Codex agents.
 4. **Orchestrate**: Click "Deploy Swarm" to initialize all PTY processes simultaneously.
-5. **Resize**: Hover between any two terminals and drag the **AgentIDE Cyan** lines to customize your view.
+5. **Resize**: Hover between any two terminals and drag the **Lattice Cyan** lines to customize your view.
 6. **Cleanup**: Use the "TERMINATE ALL AGENTS" button in the header to clear the workspace instantly.
 
 ## 🛡 Security & System Integrity
 
-AgentIDE operates with strict system permissions via the Tauri v2 capability model. It requires access to:
+Lattice operates with strict system permissions via the Tauri v2 capability model. It requires access to:
 - `dialog`: For native directory selection.
 - `fs`: For working directory initialization.
 - `process`: For spawning and managing PTY sub-processes.
 
 ---
 
-*AgentIDE - The Next-Generation Multi-Agent IDE.*
+*Lattice - The Next-Generation Multi-Agent IDE.*

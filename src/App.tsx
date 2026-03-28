@@ -34,7 +34,7 @@ function App() {
               "font-size": "1.1rem"
             }}
           >
-            AGENTIDE
+            LATTICE
           </div>
 
           <button 
@@ -112,7 +112,7 @@ function App() {
               "background": "var(--surface)",
               "z-index": 5
             }}>
-              <h1 style={{ color: "var(--primary)", "font-size": "2.5rem", "margin-bottom": "0.5rem" }}>AGENTIDE</h1>
+              <h1 style={{ color: "var(--primary)", "font-size": "2.5rem", "margin-bottom": "0.5rem" }}>LATTICE</h1>
               <p style={{ "max-width": "400px" }}>
                 The Next-Generation Multi-Agent IDE. Click the '+' button to deploy your parallel swarm.
               </p>
@@ -147,7 +147,7 @@ function App() {
         }}>
           <div style={{ display: "flex", "align-items": "center", gap: "1rem" }}>
             <span>IPC: Connected</span>
-            <span style={{ color: "var(--success)" }}>● AgentIDE Ready</span>
+            <span style={{ color: "var(--success)" }}>● Lattice Ready</span>
           </div>
           <span style={{ "margin-left": "auto" }}>
             Active Agents: {sessionStore.workspace.sessionIds.length}

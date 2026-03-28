@@ -98,7 +98,7 @@ export const LauncherModal = (props: LauncherModalProps) => {
       <div class="modal-overlay">
         <div class="launcher-modal glass-panel" style={{ width: "600px", "max-height": "90vh", "overflow-y": "auto" }}>
           <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center" }}>
-            <h3 style={{ color: "var(--primary)", "margin-bottom": "0" }}>AgentIDE Swarm Launcher</h3>
+            <h3 style={{ color: "var(--primary)", "margin-bottom": "0" }}>Lattice Swarm Launcher</h3>
             <span style={{ "font-size": "0.8rem", color: "var(--text-dim)" }}>{gridLayoutPreview()}</span>
           </div>
           
