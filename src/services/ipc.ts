@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn, type Event } from '@tauri-apps/api/event';
 import type { LauncherPreset, TerminalOutputPayload } from '../types/schema';
-import { addSession, terminateSession } from '../store/sessionStore';
+import { addSession, terminateSession, addWorkspace, addBrowserSession } from '../store/sessionStore';
 
 /**
  * Hardcoded Launcher Presets
@@ -12,7 +12,7 @@ export const PRESETS: Record<string, LauncherPreset> = {
     name: 'Gemini',
     command: {
       executable: 'powershell.exe',
-      args: ['-NoLogo', '-Command', 'gemini'],
+      args: ['-NoLogo', '-Command', '& gemini'],
     },
     runtime: 'native',
     context: 'Native',
@@ -22,7 +22,7 @@ export const PRESETS: Record<string, LauncherPreset> = {
     name: 'Claude',
     command: {
       executable: 'powershell.exe',
-      args: ['-NoLogo', '-Command', 'npx @anthropic-ai/claude-code'],
+      args: ['-NoLogo', '-Command', '& npx @anthropic-ai/claude-code'],
     },
     runtime: 'native',
     context: 'Native',
@@ -62,7 +62,7 @@ export const PRESETS: Record<string, LauncherPreset> = {
     name: 'Codex',
     command: {
       executable: 'powershell.exe',
-      args: ['-NoLogo', '-Command', 'codex'],
+      args: ['-NoLogo', '-Command', '& codex'],
     },
     runtime: 'native',
     context: 'Native',
@@ -72,30 +72,25 @@ export const PRESETS: Record<string, LauncherPreset> = {
     name: 'OpenCode',
     command: {
       executable: 'powershell.exe',
-      args: ['-NoLogo', '-Command', 'opencode'],
+      args: ['-NoLogo', '-Command', '& opencode'],
     },
     runtime: 'native',
     context: 'Native',
   },
 };
 
-/**
- * Lower-level function to spawn a process via Tauri invoke.
- * It maps the frontend's LauncherPreset to the backend's expected schema.
- */
+export type WorkspaceLaunchItem = keyof typeof PRESETS | 'Browser';
+
 export async function spawnProcess(preset: LauncherPreset): Promise<number> {
-  console.log("Invoking Tauri command 'spawn_process' with payload:", JSON.stringify({ payload: preset }, null, 2));
   try {
-    // The backend's command function expects an argument named 'payload'
-    // The payload itself must match the LauncherPreset struct in Rust
     const pid = await invoke<number>('spawn_process', { 
       payload: {
         id: preset.id,
         command: preset.command,
-        context: preset.context
+        context: preset.context,
+        cwd: preset.cwd
       } 
     });
-    console.log("Successfully spawned process. Backend returned PID:", pid);
     return pid;
   } catch (error) {
     console.error("Tauri invoke 'spawn_process' failed:", error);
@@ -104,65 +99,34 @@ export async function spawnProcess(preset: LauncherPreset): Promise<number> {
 }
 
 /**
- * High-level function to spawn a process and register it in the UI store.
+ * Batch launches a named workspace with multiple agents.
  */
-export async function handleLaunch(presetName: keyof typeof PRESETS) {
-  const basePreset = PRESETS[presetName];
-  if (!basePreset) return;
-
-  const sessionId = `s${Date.now()}`;
-  try {
-    // Clone and generate a unique sessionId for THIS instance
-    const preset = { ...basePreset, id: sessionId };
-    
-    // 1. ADD TO STORE FIRST: This triggers TerminalWrapper mounting
-    console.log(`[IPC] Pre-registering session ${sessionId} in store...`);
-    addSession(sessionId, 0, preset);
-
-    // 2. WAIT FOR MOUNT: Brief delay to ensure TerminalWrapper onMount runs
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    console.log(`[IPC] Requesting process spawn for session ${sessionId}...`);
-    const pid = await spawnProcess(preset);
-    
-    // 3. UPDATE PID
-    console.log(`[IPC] Process spawned successfully with PID: ${pid}`);
-    
-    return sessionId;
-  } catch (error) {
-    console.error(`[IPC] Launch failed for ${sessionId}:`, error);
-    // Cleanup if spawning failed
-    terminateSession(sessionId, 1);
-    throw error;
-  }
-}
-
-/**
- * Batch launches a workspace with multiple agents in a specific directory.
- */
-export async function launchWorkspace(cwd: string, agents: (keyof typeof PRESETS)[]) {
-  console.log(`[WORKSPACE] Initiating parallel launch for ${agents.length} agents in ${cwd}...`);
+export async function launchWorkspace(
+  name: string,
+  cwd: string,
+  items: WorkspaceLaunchItem[],
+  browserUrl = 'http://localhost:3000'
+) {
+  const workspaceId = `ws-${Date.now()}`;
   
-  const launchPromises = agents.map(async (presetName, index) => {
-    const basePreset = PRESETS[presetName];
-    if (!basePreset) return;
+  const launchPromises = items.map(async (item, index) => {
+    const sessionId = `${workspaceId}-${index}`;
 
-    // Unique ID for each agent in the batch
-    const sessionId = `ws-${Date.now()}-${index}`;
+    if (item === 'Browser') {
+      addBrowserSession(sessionId, browserUrl, 'Browser');
+      return sessionId;
+    }
+
+    const basePreset = PRESETS[item];
+    if (!basePreset) return null;
+
     const preset = { ...basePreset, id: sessionId, cwd };
-
-    console.log(`[WORKSPACE] Spawning agent ${index + 1}/${agents.length}: ${presetName} (ID: ${sessionId})`);
-    
-    // 1. Pre-register
     addSession(sessionId, 0, preset);
     
-    // 2. Spawn
     try {
-      const pid = await spawnProcess(preset);
-      console.log(`[WORKSPACE] Agent ${sessionId} spawned with PID ${pid}`);
+      await spawnProcess(preset);
       return sessionId;
-    } catch (e) {
-      console.error(`[WORKSPACE] Failed to spawn agent ${sessionId}:`, e);
+    } catch (error) {
       terminateSession(sessionId, 1);
       return null;
     }
@@ -171,34 +135,22 @@ export async function launchWorkspace(cwd: string, agents: (keyof typeof PRESETS
   const results = await Promise.all(launchPromises);
   const activeIds = results.filter((id): id is string => id !== null);
   
-  console.log(`[WORKSPACE] Batch launch complete. ${activeIds.length}/${agents.length} agents active.`);
-  return activeIds;
+  addWorkspace(workspaceId, name || "Untitled Workspace", activeIds);
+  return workspaceId;
 }
 
-/**
- * Sends data to the stdin of a specific session.
- */
 export async function writeToStdin(id: string, data: number[]): Promise<void> {
   await invoke<void>('write_to_stdin', { id, data });
 }
 
-/**
- * Force terminates a process by id.
- */
 export async function killProcess(id: string): Promise<void> {
   await invoke<void>('kill_process', { id });
 }
 
-/**
- * Resizes the PTY on the backend.
- */
 export async function resizeTerminal(id: string, rows: number, cols: number): Promise<void> {
   await invoke<void>('resize_terminal', { id, rows, cols });
 }
 
-/**
- * Listens for terminal output events emitted by the backend.
- */
 export async function listenToTerminalOutput(
   callback: (payload: TerminalOutputPayload) => void
 ): Promise<UnlistenFn> {
@@ -207,9 +159,6 @@ export async function listenToTerminalOutput(
   });
 }
 
-/**
- * Listens for process exit events emitted by the backend.
- */
 export async function listenToProcessExit(
   callback: (payload: { id: string, exit_code: number | null }) => void
 ): Promise<UnlistenFn> {
