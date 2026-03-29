@@ -4,11 +4,13 @@ Lattice is a desktop workspace for running multiple AI coding agents in parallel
 
 ## Features
 
-- Mixed workspace launcher: combine terminal agents and browser tiles in one launch.
-- Multiplexed grid workspace: auto-layout for 1 to 12+ sessions.
-- PTY-backed terminals: Rust + `portable-pty` process management with xterm.js rendering.
-- Workspace tabs: create, rename, recolor, and close workspaces.
-- Custom window chrome: integrated title bar and controls.
+- **The Swarm Builder**: A premium, multi-step onboarding experience for creating your workspace with a live grid preview.
+- **Predictive Launching (Speed Booting)**: Reduces perceived latency by pre-spawning agent PTY processes in the background while you configure your swarm.
+- **Mixed Workspace Launcher**: Combine terminal agents and browser tiles in one launch.
+- **Multiplexed Grid Workspace**: Auto-layout optimized for 1 to 12+ sessions.
+- **PTY-Backed Terminals**: Rust + `portable-pty` process management with WebGL-enabled xterm.js rendering.
+- **Workspace Tabs**: Create, rename, recolor, and close workspaces with ease.
+- **Custom Window Chrome**: Integrated title bar and native-feeling window controls.
 
 ## Browser Tile Behavior
 
