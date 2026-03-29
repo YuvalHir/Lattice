@@ -82,8 +82,15 @@ export const PRESETS: Record<string, LauncherPreset> = {
 export type WorkspaceLaunchItem = keyof typeof PRESETS | 'Browser';
 
 export async function spawnProcess(preset: LauncherPreset): Promise<number> {
+  console.log(`[LAUNCHER] Attempting to spawn process for ${preset.id}...`);
+  
+  // Keep a guard timeout, but allow slower shells (especially WSL) enough time.
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`Spawn timeout for ${preset.id} after 30s`)), 30000);
+  });
+
   try {
-    const pid = await invoke<number>('spawn_process', {
+    const invokePromise = invoke<number>('spawn_process', {
       payload: {
         id: preset.id,
         command: preset.command,
@@ -91,44 +98,59 @@ export async function spawnProcess(preset: LauncherPreset): Promise<number> {
         cwd: preset.cwd
       }
     });
+
+    const pid = await Promise.race([invokePromise, timeoutPromise]) as number;
+    console.log(`[LAUNCHER] Successfully spawned ${preset.id} with PID ${pid}`);
     return pid;
   } catch (error) {
-    console.error("Tauri invoke 'spawn_process' failed:", error);
+    console.error(`[LAUNCHER] Spawn failed for ${preset.id}:`, error);
     throw error;
   }
 }
 
 /**
  * Batch launches a named workspace with multiple agents.
- * Can adopt pre-launched sessions via preLaunchedIds.
+ * Can adopt pre-launched sessions via preLaunchedIds map.
  */
 export async function launchWorkspace(
   name: string,
   cwd: string,
   items: WorkspaceLaunchItem[],
   browserUrl = 'http://localhost:3000',
-  preLaunchedIds: string[] = []
+  preLaunchedIds: Record<string, string[]> = {}
 ) {
+  console.log(`[LAUNCHER] Starting workspace launch for "${name}" in ${cwd}`);
   const workspaceId = `ws-${Date.now()}`;
-  const preLaunchedQueue = [...preLaunchedIds];
+  
+  // Create mutable queues for each type from the preLaunchedIds map
+  const preLaunchedQueues: Record<string, string[]> = {};
+  Object.entries(preLaunchedIds).forEach(([type, ids]) => {
+    preLaunchedQueues[type] = [...ids];
+  });
 
   const launchPromises = items.map(async (item, index) => {
     // If it's a browser, or no pre-launched items of this type exist, create new ID
-    const usePreLaunched = item !== 'Browser' && preLaunchedQueue.length > 0;
-    const sessionId = usePreLaunched ? preLaunchedQueue.shift()! : `${workspaceId}-${index}`;
+    const queue = preLaunchedQueues[item] || [];
+    const usePreLaunched = item !== 'Browser' && queue.length > 0;
+    const sessionId = usePreLaunched ? queue.shift()! : `${workspaceId}-${index}`;
 
     if (item === 'Browser') {
       addBrowserSession(sessionId, browserUrl, 'Browser');
+      console.log(`[LAUNCHER] Added browser session: ${sessionId}`);
       return sessionId;
     }
 
     // If it was already in the store (pre-launched), just return ID
     if (usePreLaunched) {
+      console.log(`[LAUNCHER] Adopting pre-launched session (${item}) in ${cwd}: ${sessionId}`);
       return sessionId;
     }
 
-    const basePreset = PRESETS[item];
-    if (!basePreset) return null;
+    const basePreset = PRESETS[item as keyof typeof PRESETS];
+    if (!basePreset) {
+      console.warn(`[LAUNCHER] Unknown item type: ${item}`);
+      return null;
+    }
 
     const preset = { ...basePreset, id: sessionId, cwd };
     addSession(sessionId, 0, preset);
@@ -138,14 +160,20 @@ export async function launchWorkspace(
       updateSessionPid(sessionId, pid);
       return sessionId;
     } catch (error) {
+      console.error(`[LAUNCHER] Failed to spawn agent ${item}:`, error);
       terminateSession(sessionId, 1);
       return null;
     }
   });
 
+  console.log(`[LAUNCHER] Waiting for ${items.length} agents to initialize...`);
   const results = await Promise.all(launchPromises);
   const activeIds = results.filter((id): id is string => id !== null);
 
+  console.log(`[LAUNCHER] Launch sequence complete. Active agents: ${activeIds.length}`);
+  if (items.length > 0 && activeIds.length === 0) {
+    throw new Error("Workspace launch failed: no sessions were started.");
+  }
   addWorkspace(workspaceId, name || "Untitled Workspace", activeIds, cwd);
   return workspaceId;
 }

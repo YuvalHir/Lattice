@@ -117,6 +117,21 @@ function App() {
     setEditingWorkspaceId(null);
   };
 
+  const forceTerminalReflow = () => {
+    const pulses = [0, 50, 140, 260];
+    pulses.forEach((delay) => {
+      window.setTimeout(() => {
+        window.dispatchEvent(new Event("resize"));
+        window.dispatchEvent(new Event("terminal-force-reflow"));
+      }, delay);
+    });
+  };
+
+  const handleWorkspaceTabClick = (id: string) => {
+    setActiveWorkspace(id);
+    forceTerminalReflow();
+  };
+
   const onTabContextMenu = (e: MouseEvent, id: string) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, id });
@@ -157,7 +172,7 @@ function App() {
           <For each={sessionStore.workspaces}>
             {(ws) => (
               <div 
-                onClick={() => setActiveWorkspace(ws.id)}
+                onClick={() => handleWorkspaceTabClick(ws.id)}
                 onDblClick={() => setEditingWorkspaceId(ws.id)}
                 onContextMenu={(e) => onTabContextMenu(e, ws.id)}
                 style={{
@@ -250,7 +265,7 @@ function App() {
               </Show>
             </section>
 
-            <footer style={{ height: "22px", "font-size": "10px", display: "flex", "align-items": "center", padding: "0 0.75rem", color: "var(--text-muted)", background: "#0d1117", "border-top": "1px solid var(--border-main)" }}>
+            <footer style={{ height: "22px", "font-size": "10px", display: "flex", "align-items": "center", padding: "0 0.75rem", color: "var(--text-muted)", background: "#0d1117", "border-top": "1px solid var(--border-main)", "flex-shrink": 0 }}>
               <div style={{ display: "flex", "align-items": "center", gap: "1rem" }}>
                 <span style={{ color: "var(--accent-primary)" }}>● READY</span>
                 <span style={{ "border-left": "1px solid var(--border-main)", "padding-left": "1rem", "font-family": "var(--font-mono)", "opacity": 0.8 }}>
@@ -267,7 +282,9 @@ function App() {
         </div>
       </div>
 
-      <LauncherModal isOpen={isLauncherOpen()} onClose={() => setIsLauncherOpen(false)} />
+      <Show when={isLauncherOpen()}>
+        <LauncherModal isOpen={true} onClose={() => setIsLauncherOpen(false)} />
+      </Show>
       <SettingsPage isActive={isSettingsOpen()} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );

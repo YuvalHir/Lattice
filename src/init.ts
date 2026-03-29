@@ -1,5 +1,5 @@
 import { listenToTerminalOutput, listenToProcessExit } from './services/ipc';
-import { appendOutput, terminateSession } from './store/sessionStore';
+import { appendOutput, terminateSession, sessionStore } from './store/sessionStore';
 import { terminalRegistry } from './components/TerminalWrapper';
 
 /**
@@ -10,13 +10,17 @@ export async function initializeApp() {
 
   // Start listening for terminal output from the backend
   const unlistenOutput = await listenToTerminalOutput((payload) => {
-    // 1. Persist to store (string-based append)
+    // Persist to store for history/catch-up.
     appendOutput(payload.id, payload.data);
 
-    // 2. Direct-pipe to xterm.js instance for immediate rendering
+    // Direct-pipe active workspace output for low-latency interactive CLIs (Gemini/Claude/Codex).
+    // TerminalWrapper keeps lastWrittenIndex in sync to avoid duplicate rendering.
     const term = terminalRegistry.get(payload.id);
     if (term) {
-      term.write(payload.data);
+      const ws = sessionStore.workspaces.find(w => w.sessionIds.includes(payload.id));
+      if (ws && ws.id === sessionStore.activeWorkspaceId) {
+        term.write(payload.data);
+      }
     }
   });
 

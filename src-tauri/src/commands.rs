@@ -1,19 +1,17 @@
+use crate::process::spawn_with_pty;
+use crate::state::{ExecutionContext, SessionHandle, SessionRegistry, SessionStatus};
+use serde::{Deserialize, Serialize};
+use std::io::{Read, Write};
+use std::sync::Arc;
+use sysinfo::{Pid, ProcessesToUpdate, System};
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::{mpsc, Mutex};
-use std::sync::Arc;
-use std::io::{Read, Write};
-use serde::{Serialize, Deserialize};
-use crate::state::{SessionRegistry, SessionHandle, SessionStatus, ExecutionContext};
-use crate::process::spawn_with_pty;
-use std::process::Command;
-use sysinfo::{System, Pid, ProcessesToUpdate};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MemoryUsage {
     pub workspace_bytes: u64,
     pub total_bytes: u64,
 }
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GitFileStatus {
@@ -70,13 +68,14 @@ pub async fn spawn_process(
     state: State<'_, Arc<Mutex<SessionRegistry>>>,
     payload: LauncherPreset,
 ) -> Result<u32, String> {
-    // Aggressive logging for debug
-    println!("[WORKSPACE] INITIATING SPAWN FOR ID: {}", payload.id);
-    println!("[WORKSPACE] DIRECTORY: {:?}", payload.cwd);
-    println!("[WORKSPACE] FULL PAYLOAD: {:?}", payload);
+    println!(
+        "[BACKEND] spawn_process start id={} cwd={:?} cmd={}",
+        payload.id, payload.cwd, payload.command.executable
+    );
 
+    // Aggressive logging for debug
     let session_id = payload.id.clone();
-    
+
     // We now have the direct ExecutionContext from the frontend
     let context = payload.context.clone();
 
@@ -87,20 +86,18 @@ pub async fn spawn_process(
         }
     }
 
-    // Spawn with PTY
     let (pair, mut child) = spawn_with_pty(
         &context,
         &payload.command.executable,
         &payload.command.args,
         payload.cwd.clone(),
-    ).map_err(|e| {
+    )
+    .map_err(|e| {
         let err = format!("PTY Spawn Error: {}", e);
-        eprintln!("[!] {}", err);
         err
     })?;
 
     let pid = child.process_id().unwrap_or(0);
-    println!("[WORKSPACE] PTY Process spawned with PID {} in {:?}", pid, payload.cwd);
 
     let mut master_reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
     let mut master_writer = pair.master.take_writer().map_err(|e| e.to_string())?;
@@ -112,45 +109,42 @@ pub async fn spawn_process(
     let session_id_reader = session_id.clone();
     std::thread::spawn(move || {
         let mut buffer = [0u8; 4096];
-        println!("[PTY] Reader loop started for session {}", session_id_reader);
-        
+        // println!(
+        //     "[PTY] Reader loop started for session {}",
+        //     session_id_reader
+        // );
+
         loop {
             match master_reader.read(&mut buffer) {
                 Ok(n) if n > 0 => {
-                    let cleaned_bytes: Vec<u8> = buffer[..n].iter()
-                        .cloned()
-                        .filter(|&b| b != 0x00)
-                        .collect();
+                    let cleaned_bytes: Vec<u8> =
+                        buffer[..n].iter().cloned().filter(|&b| b != 0x00).collect();
 
                     if !cleaned_bytes.is_empty() {
                         let data_str = String::from_utf8_lossy(&cleaned_bytes).into_owned();
-                        println!("[PTY] Read {} bytes from session {}. Emitting terminal-output.", n, session_id_reader);
-                        
-                        let _ = app_reader.emit("terminal-output", TerminalOutputPayload {
-                            id: session_id_reader.clone(),
-                            data: data_str,
-                        });
-                        println!("[PTY] Emit call confirmed for session {}", session_id_reader);
+                        let _ = app_reader.emit(
+                            "terminal-output",
+                            TerminalOutputPayload {
+                                id: session_id_reader.clone(),
+                                data: data_str,
+                            },
+                        );
                     }
                 }
                 Ok(_) => {
-                    println!("[PTY] Reader EOF (0 bytes) for session {}", session_id_reader);
                     break;
                 }
-                Err(e) => {
-                    eprintln!("[PTY] Reader Error for session {}: {}", session_id_reader, e.to_string());
+                Err(_e) => {
                     break;
                 }
             }
         }
-        println!("[PTY] Reader loop terminated for session {}", session_id_reader);
     });
 
     // Writer task
     tokio::spawn(async move {
         while let Some(data) = stdin_rx.recv().await {
-            if let Err(e) = master_writer.write_all(&data) {
-                eprintln!("[PTY STDIN] Error writing to PID {}: {}", pid, e);
+            if let Err(_e) = master_writer.write_all(&data) {
                 break;
             }
             let _ = master_writer.flush();
@@ -161,7 +155,7 @@ pub async fn spawn_process(
     let state_monitor = state.inner().clone();
     let session_id_monitor = session_id.clone();
     let app_monitor = app.clone();
-    
+
     {
         let mut registry = state_monitor.lock().await;
         registry.sessions.insert(
@@ -177,30 +171,35 @@ pub async fn spawn_process(
     }
 
     tokio::spawn(async move {
-        let status = child.wait();
+        // Wait on the PTY child in the blocking pool, not on core tokio workers.
+        // Otherwise each session can pin a runtime thread and starve the app.
+        let status = tokio::task::spawn_blocking(move || child.wait()).await;
         let exit_code = match status {
-            Ok(s) => {
-                println!("[PROCESS] PTY Child Exited: Session {} with status {:?}", session_id_monitor, s);
+            Ok(Ok(_status)) => {
                 // Attempt to get exit code (this might be platform specific in portable-pty)
-                None 
-            }
-            Err(e) => {
-                eprintln!("[PROCESS] Error waiting for child in session {}: {}", session_id_monitor, e);
                 None
             }
+            Ok(Err(_err)) => None,
+            Err(_join_err) => None,
         };
 
-        let _ = app_monitor.emit("process-exit", ProcessExitPayload {
-            id: session_id_monitor.clone(),
-            exit_code,
-        });
+        let _ = app_monitor.emit(
+            "process-exit",
+            ProcessExitPayload {
+                id: session_id_monitor.clone(),
+                exit_code,
+            },
+        );
 
         let mut registry = state_monitor.lock().await;
         if let Some(handle) = registry.sessions.get_mut(&session_id_monitor) {
             handle.status = SessionStatus::Terminated;
         }
+
+        println!("[BACKEND] process-exit id={}", session_id_monitor);
     });
 
+    println!("[BACKEND] spawn_process ready id={} pid={}", session_id, pid);
     Ok(pid)
 }
 
@@ -213,13 +212,20 @@ pub async fn resize_terminal(
 ) -> Result<(), String> {
     let registry = state.lock().await;
     if let Some(handle) = registry.sessions.get(&id) {
-        handle.pty_pair.master.resize(portable_pty::PtySize {
-            rows,
-            cols,
-            pixel_width: 0,
-            pixel_height: 0,
-        }).map_err(|e| e.to_string())?;
-        println!("[WORKSPACE] PTY Resized for session {}: {}x{}", id, rows, cols);
+        handle
+            .pty_pair
+            .master
+            .resize(portable_pty::PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|e| e.to_string())?;
+        // println!(
+        //     "[WORKSPACE] PTY Resized for session {}: {}x{}",
+        //     id, rows, cols
+        // );
         Ok(())
     } else {
         Err(format!("Session {} not found", id))
@@ -232,12 +238,20 @@ pub async fn write_to_stdin(
     id: String, // Changed from session_id
     data: Vec<u8>,
 ) -> Result<(), String> {
-    let registry = state.lock().await;
-    if let Some(handle) = registry.sessions.get(&id) {
-        handle.stdin_tx.send(data).await.map_err(|e| e.to_string())?;
-        Ok(())
-    } else {
-        Err(format!("Session {} not found", id))
+    // Never hold the global registry lock across await points.
+    // If this send blocks on a full channel, holding the lock can stall
+    // all other terminal commands (spawn/resize/kill) and freeze the app.
+    let stdin_tx = {
+        let registry = state.lock().await;
+        registry.sessions.get(&id).map(|handle| handle.stdin_tx.clone())
+    };
+
+    match stdin_tx {
+        Some(tx) => {
+            tx.send(data).await.map_err(|e| e.to_string())?;
+            Ok(())
+        }
+        None => Err(format!("Session {} not found", id)),
     }
 }
 
@@ -246,69 +260,88 @@ pub async fn kill_process(
     state: State<'_, Arc<Mutex<SessionRegistry>>>,
     id: String, // Changed from session_id
 ) -> Result<(), String> {
-    let mut registry = state.lock().await;
-    if let Some(handle) = registry.sessions.get(&id) {
-        let pid = handle.pid;
-        #[cfg(windows)]
-        {
-            let mut kill = std::process::Command::new("taskkill")
-                .arg("/F")
-                .arg("/T")
-                .arg("/PID")
-                .arg(pid.to_string())
-                .spawn()
-                .map_err(|e| e.to_string())?;
-            let _ = kill.wait();
-        }
-        #[cfg(not(windows))]
-        {
-            let mut kill = std::process::Command::new("kill")
-                .arg("-9")
-                .arg(pid.to_string())
-                .spawn()
-                .map_err(|e| e.to_string())?;
-            let _ = kill.wait();
-        }
-        registry.sessions.remove(&id);
-        Ok(())
-    } else {
-        Err(format!("Session {} not found", id))
+    // Read the PID under lock, but perform potentially slow process-kill
+    // operations outside the lock so other sessions remain responsive.
+    let pid = {
+        let registry = state.lock().await;
+        registry.sessions.get(&id).map(|handle| handle.pid)
+    };
+
+    let Some(pid) = pid else {
+        return Err(format!("Session {} not found", id));
+    };
+    println!("[BACKEND] kill_process id={} pid={}", id, pid);
+
+    #[cfg(windows)]
+    {
+        let mut kill = std::process::Command::new("taskkill")
+            .arg("/F")
+            .arg("/T")
+            .arg("/PID")
+            .arg(pid.to_string())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let _ = kill.wait();
     }
+    #[cfg(not(windows))]
+    {
+        let mut kill = std::process::Command::new("kill")
+            .arg("-9")
+            .arg(pid.to_string())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let _ = kill.wait();
+    }
+
+    let mut registry = state.lock().await;
+    registry.sessions.remove(&id);
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn get_git_info(cwd: String) -> Result<GitInfo, String> {
-    let output = Command::new("git")
+    let output = tokio::process::Command::new("git")
         .args(["rev-parse", "--is-inside-work-tree"])
         .current_dir(&cwd)
         .output()
+        .await
         .map_err(|e| e.to_string())?;
 
     if !output.status.success() {
-        return Ok(GitInfo { is_repo: false, branch: "".to_string() });
+        return Ok(GitInfo {
+            is_repo: false,
+            branch: "".to_string(),
+        });
     }
 
-    let branch_output = Command::new("git")
+    let branch_output = tokio::process::Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .current_dir(&cwd)
         .output()
+        .await
         .map_err(|e| e.to_string())?;
 
     let branch = if branch_output.status.success() {
-        String::from_utf8_lossy(&branch_output.stdout).trim().to_string()
+        String::from_utf8_lossy(&branch_output.stdout)
+            .trim()
+            .to_string()
     } else {
         "HEAD".to_string()
     };
 
-    Ok(GitInfo { is_repo: true, branch })
+    Ok(GitInfo {
+        is_repo: true,
+        branch,
+    })
 }
 
 #[tauri::command]
 pub async fn git_status(cwd: String) -> Result<Vec<GitFileStatus>, String> {
-    let output = Command::new("git")
+    let output = tokio::process::Command::new("git")
         .args(["status", "--porcelain"])
         .current_dir(&cwd)
         .output()
+        .await
         .map_err(|e| e.to_string())?;
 
     if !output.status.success() {
@@ -319,7 +352,9 @@ pub async fn git_status(cwd: String) -> Result<Vec<GitFileStatus>, String> {
     let mut statuses = Vec::new();
 
     for line in stdout.lines() {
-        if line.len() < 4 { continue; }
+        if line.len() < 4 {
+            continue;
+        }
         let (status_chars, path) = line.split_at(3);
         let path = path.trim().to_string();
 
@@ -339,7 +374,11 @@ pub async fn git_status(cwd: String) -> Result<Vec<GitFileStatus>, String> {
         if worktree_status != ' ' {
             statuses.push(GitFileStatus {
                 path: path.clone(),
-                status: if worktree_status == '?' { "U".to_string() } else { worktree_status.to_string() },
+                status: if worktree_status == '?' {
+                    "U".to_string()
+                } else {
+                    worktree_status.to_string()
+                },
                 staged: false,
             });
         }
@@ -350,10 +389,11 @@ pub async fn git_status(cwd: String) -> Result<Vec<GitFileStatus>, String> {
 
 #[tauri::command]
 pub async fn git_add(cwd: String, path: String) -> Result<(), String> {
-    let status = Command::new("git")
+    let status = tokio::process::Command::new("git")
         .args(["add", &path])
         .current_dir(&cwd)
         .status()
+        .await
         .map_err(|e| e.to_string())?;
 
     if status.success() {
@@ -365,10 +405,11 @@ pub async fn git_add(cwd: String, path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn git_unstage(cwd: String, path: String) -> Result<(), String> {
-    let status = Command::new("git")
+    let status = tokio::process::Command::new("git")
         .args(["reset", "HEAD", "--", &path])
         .current_dir(&cwd)
         .status()
+        .await
         .map_err(|e| e.to_string())?;
 
     if status.success() {
@@ -380,10 +421,11 @@ pub async fn git_unstage(cwd: String, path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn git_commit(cwd: String, message: String) -> Result<(), String> {
-    let status = Command::new("git")
+    let status = tokio::process::Command::new("git")
         .args(["commit", "-m", &message])
         .current_dir(&cwd)
         .status()
+        .await
         .map_err(|e| e.to_string())?;
 
     if status.success() {
@@ -395,10 +437,11 @@ pub async fn git_commit(cwd: String, message: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn git_push(cwd: String) -> Result<(), String> {
-    let status = Command::new("git")
+    let status = tokio::process::Command::new("git")
         .args(["push"])
         .current_dir(&cwd)
         .status()
+        .await
         .map_err(|e| e.to_string())?;
 
     if status.success() {
@@ -410,10 +453,11 @@ pub async fn git_push(cwd: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn git_init(cwd: String) -> Result<(), String> {
-    let status = Command::new("git")
+    let status = tokio::process::Command::new("git")
         .args(["init"])
         .current_dir(&cwd)
         .status()
+        .await
         .map_err(|e| e.to_string())?;
 
     if status.success() {
@@ -425,10 +469,11 @@ pub async fn git_init(cwd: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn git_add_all(cwd: String) -> Result<(), String> {
-    let status = Command::new("git")
+    let status = tokio::process::Command::new("git")
         .args(["add", "."])
         .current_dir(&cwd)
         .status()
+        .await
         .map_err(|e| e.to_string())?;
 
     if status.success() {
@@ -440,14 +485,14 @@ pub async fn git_add_all(cwd: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn get_git_log(cwd: String) -> Result<Vec<GitCommit>, String> {
-    let output = Command::new("git")
+    let output = tokio::process::Command::new("git")
         .args(["log", "--pretty=format:%h|%an|%ar|%s", "-n", "20"])
         .current_dir(&cwd)
         .output()
+        .await
         .map_err(|e| e.to_string())?;
 
     if !output.status.success() {
-        // Might be a new repo with no commits yet
         return Ok(Vec::new());
     }
 
@@ -461,7 +506,7 @@ pub async fn get_git_log(cwd: String) -> Result<Vec<GitCommit>, String> {
                 hash: parts[0].to_string(),
                 author: parts[1].to_string(),
                 date: parts[2].to_string(),
-                message: parts[3..].join("|"), // Handle messages containing |
+                message: parts[3..].join("|"),
             });
         }
     }
@@ -472,19 +517,27 @@ pub async fn get_git_log(cwd: String) -> Result<Vec<GitCommit>, String> {
 #[tauri::command]
 pub async fn get_memory_usage(workspace_pids: Vec<u32>) -> Result<MemoryUsage, String> {
     let mut sys = System::new_all();
-    // Use the 2-argument refresh_processes signature for sysinfo 0.33.x
     sys.refresh_processes(ProcessesToUpdate::All, true);
 
     let current_pid = Pid::from_u32(std::process::id());
-    
+
+    // Single pass to build parent-child map for faster lookups
+    let mut children_map: std::collections::HashMap<Pid, Vec<Pid>> =
+        std::collections::HashMap::new();
+    for (&pid, process) in sys.processes() {
+        if let Some(parent) = process.parent() {
+            children_map.entry(parent).or_default().push(pid);
+        }
+    }
+
     // Total memory: Lattice (current process) and all its descendants
-    let total_bytes = get_recursive_memory(&sys, current_pid);
+    let total_bytes = get_memory_recursive(&sys, &children_map, current_pid);
 
-    // Workspace memory: Sum of provided PIDs and their descendants
-    let workspace_bytes = workspace_pids.iter()
-        .map(|&pid| get_recursive_memory(&sys, Pid::from_u32(pid)))
+    // Workspace memory: Sum of provided root PIDs and their descendants
+    let workspace_bytes = workspace_pids
+        .iter()
+        .map(|&pid| get_memory_recursive(&sys, &children_map, Pid::from_u32(pid)))
         .sum();
-
 
     Ok(MemoryUsage {
         workspace_bytes,
@@ -492,7 +545,11 @@ pub async fn get_memory_usage(workspace_pids: Vec<u32>) -> Result<MemoryUsage, S
     })
 }
 
-fn get_recursive_memory(sys: &System, root_pid: Pid) -> u64 {
+fn get_memory_recursive(
+    sys: &System,
+    children_map: &std::collections::HashMap<Pid, Vec<Pid>>,
+    root_pid: Pid,
+) -> u64 {
     let mut total = 0;
     let mut queue = vec![root_pid];
     let mut visited = std::collections::HashSet::new();
@@ -504,17 +561,14 @@ fn get_recursive_memory(sys: &System, root_pid: Pid) -> u64 {
 
         if let Some(process) = sys.process(pid) {
             total += process.memory();
-            
-            // Add children to queue
-            for (child_pid, child_proc) in sys.processes() {
-                if let Some(parent_pid) = child_proc.parent() {
-                    if parent_pid == pid {
-                        queue.push(*child_pid);
-                    }
+
+            // Efficiently add children from the pre-built map
+            if let Some(children) = children_map.get(&pid) {
+                for &child in children {
+                    queue.push(child);
                 }
             }
         }
     }
     total
 }
-

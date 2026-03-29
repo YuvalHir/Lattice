@@ -29,18 +29,27 @@ export const SourceControlPanel = () => {
 
   const refreshStatus = async () => {
     const ws = activeWorkspace();
+    
+    // Reset state before fetching new data
+    setGitInfo(null);
+    setStatusList([]);
+    setCommitLog([]);
+    setError(null);
+
     if (!ws) return;
 
+    console.log(`[SCM] Refreshing status for workspace: ${ws.name} (${ws.cwd})`);
     setIsRefreshing(true);
-    setError(null);
     try {
       const info = await getGitInfo(ws.cwd);
+      console.log(`[SCM] Git Info for ${ws.name}:`, info);
       setGitInfo(info);
       if (info.is_repo) {
         const [statuses, log] = await Promise.all([
           gitStatus(ws.cwd),
           getGitLog(ws.cwd)
         ]);
+        console.log(`[SCM] Statuses found: ${statuses.length}, Commits: ${log.length}`);
         setStatusList(statuses);
         setCommitLog(log);
         
@@ -50,6 +59,7 @@ export const SourceControlPanel = () => {
         }
       }
     } catch (e: any) {
+      console.error(`[SCM] Error refreshing ${ws.name}:`, e);
       setError(e.toString());
     } finally {
       setIsRefreshing(false);
@@ -57,7 +67,9 @@ export const SourceControlPanel = () => {
   };
 
   createEffect(() => {
-    if (sessionStore.isSourceControlOpen && sessionStore.activeWorkspaceId) {
+    // We track both the active ID and the workspaces array to ensure we refresh 
+    // whenever a workspace is added or switched.
+    if (sessionStore.isSourceControlOpen && sessionStore.activeWorkspaceId && sessionStore.workspaces.length >= 0) {
       refreshStatus();
     }
   });

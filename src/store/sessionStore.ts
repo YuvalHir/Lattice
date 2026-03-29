@@ -68,11 +68,13 @@ export function addWorkspace(id: string, name: string, sessionIds: string[], cwd
   const color = availableColors.length > 0 
     ? availableColors[0] 
     : WORKSPACE_COLORS[store.workspaces.length % WORKSPACE_COLORS.length];
-  setStore('workspaces', (prev) => [
-    ...prev,
-    { id, name, sessionIds, layout: 'auto', color, cwd }
-  ]);
-  setStore('activeWorkspaceId', id);
+  setStore({
+    workspaces: [
+      ...store.workspaces,
+      { id, name, sessionIds, layout: 'auto', color, cwd }
+    ],
+    activeWorkspaceId: id
+  });
 }
 
 export function toggleSourceControl() {
@@ -221,10 +223,13 @@ export function removeWorkspace(id: string) {
   if (ws) {
     ws.sessionIds.forEach(sid => removeSession(sid));
   }
-  setStore('workspaces', (prev) => prev.filter(w => w.id !== id));
-  if (store.activeWorkspaceId === id) {
-    setStore('activeWorkspaceId', store.workspaces.length > 0 ? store.workspaces[0].id : null);
-  }
+  const newWorkspaces = store.workspaces.filter(w => w.id !== id);
+  setStore({
+    workspaces: newWorkspaces,
+    activeWorkspaceId: store.activeWorkspaceId === id 
+      ? (newWorkspaces.length > 0 ? newWorkspaces[0].id : null)
+      : store.activeWorkspaceId
+  });
 }
 
 /**

@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Show, onMount, JSX } from "solid-js";
+import { createEffect, createSignal, For, Show, onMount, onCleanup, JSX } from "solid-js";
 import { open } from "@tauri-apps/plugin-dialog";
 import { homeDir } from "@tauri-apps/api/path";
 import { launchWorkspace, spawnProcess, killProcess, type WorkspaceLaunchItem, PRESETS } from "../services/ipc";
@@ -68,10 +68,17 @@ export const LauncherModal = (props: LauncherModalProps) => {
   const [isLaunching, setIsLaunching] = createSignal(false);
   const [sessionCounts, setSessionCounts] = createSignal<SessionCounts>({ ...settingsStore.defaultSessionCounts });
   
-  // Track pre-launched session IDs by type
   const [preLaunched, setPreLaunched] = createSignal<Record<SessionType, string[]>>({
     Gemini: [], Claude: [], Codex: [], OpenCode: [], WSL: [], Browser: []
   });
+  
+  // Track how many are currently in the process of spawning to prevent duplicates
+  const [spawningCounts, setSpawningCounts] = createSignal<Record<SessionType, number>>({
+    Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0
+  });
+
+  // Track the directory for which we've pre-launched agents
+  const [preLaunchedCwd, setPreLaunchedCwd] = createSignal<string | null>(null);
 
   const totalSessions = () => Object.values(sessionCounts()).reduce((a, b) => a + b, 0);
 
@@ -84,56 +91,72 @@ export const LauncherModal = (props: LauncherModalProps) => {
   });
 
   // PREDICTIVE LAUNCHING EFFECT
-  createEffect(async () => {
+  createEffect(() => {
     if (!props.isOpen || step() === "basics") return;
+
+    const currentDir = selectedDir();
+    if (!currentDir) return;
+
+    // If the directory changed, purge all stale pre-launched agents
+    if (preLaunchedCwd() && preLaunchedCwd() !== currentDir) {
+      console.log(`[LAUNCHER] Directory changed from ${preLaunchedCwd()} to ${currentDir}. Purging stale agents.`);
+      cleanupAllPreLaunched();
+      setPreLaunchedCwd(currentDir);
+      return;
+    }
+    
+    if (!preLaunchedCwd()) {
+      setPreLaunchedCwd(currentDir);
+    }
 
     const counts = sessionCounts();
     const launched = preLaunched();
-    const newLaunched = { ...launched };
-    let changed = false;
+    const spawning = spawningCounts();
 
     for (const type of SESSION_TYPES) {
-      if (type === "Browser") continue; // Spawning browser is instant in UI
+      if (type === "Browser") continue;
 
       const targetCount = counts[type];
-      const currentLaunched = launched[type];
+      const currentCount = launched[type].length + spawning[type];
 
-      // Spawn if needed
-      if (currentLaunched.length < targetCount) {
-        const diff = targetCount - currentLaunched.length;
+      if (currentCount < targetCount) {
+        const diff = targetCount - currentCount;
         for (let i = 0; i < diff; i++) {
           const tempId = `temp-${type}-${Math.random().toString(36).slice(2, 9)}`;
           const basePreset = PRESETS[type];
           if (basePreset) {
-            const preset = { ...basePreset, id: tempId, cwd: selectedDir()! };
-            // Add to store in background mode
+            const preset = { ...basePreset, id: tempId, cwd: currentDir };
+            
+            // Mark as spawning
+            setSpawningCounts(prev => ({ ...prev, [type]: prev[type] + 1 }));
             addSession(tempId, 0, preset, true);
-            try {
-              const pid = await spawnProcess(preset);
+            
+            spawnProcess(preset).then(pid => {
               updateSessionPid(tempId, pid);
-              newLaunched[type] = [...newLaunched[type], tempId];
-              changed = true;
-            } catch (e) {
+              setPreLaunched(prev => ({ ...prev, [type]: [...prev[type], tempId] }));
+            }).catch(() => {
               terminateSession(tempId, 1);
-            }
+            }).finally(() => {
+              // Mark as no longer spawning
+              setSpawningCounts(prev => ({ ...prev, [type]: Math.max(0, prev[type] - 1) }));
+            });
           }
         }
       } 
-      // Kill if needed
-      else if (currentLaunched.length > targetCount) {
-        const diff = currentLaunched.length - targetCount;
+      else if (launched[type].length > targetCount) {
+        const diff = launched[type].length - targetCount;
         for (let i = 0; i < diff; i++) {
-          const idToKill = newLaunched[type][newLaunched[type].length - 1];
-          newLaunched[type] = newLaunched[type].slice(0, -1);
-          changed = true;
-          killProcess(idToKill).catch(() => {});
-          terminateSession(idToKill, 0);
+          setPreLaunched(prev => {
+            const list = [...prev[type]];
+            const idToKill = list.pop();
+            if (idToKill) {
+              killProcess(idToKill).catch(() => {});
+              terminateSession(idToKill, 0);
+            }
+            return { ...prev, [type]: list };
+          });
         }
       }
-    }
-
-    if (changed) {
-      setPreLaunched(newLaunched);
     }
   });
 
@@ -145,14 +168,16 @@ export const LauncherModal = (props: LauncherModalProps) => {
       terminateSession(id, 0);
     }
     setPreLaunched({ Gemini: [], Claude: [], Codex: [], OpenCode: [], WSL: [], Browser: [] });
+    setSpawningCounts({ Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0 });
   };
 
-  createEffect(() => {
-    if (props.isOpen) {
-      setStep("basics");
-    } else {
-      cleanupAllPreLaunched();
-    }
+  onMount(() => {
+    window.addEventListener("keydown", handleKeyDown);
+  });
+
+  onCleanup(() => {
+    window.removeEventListener("keydown", handleKeyDown);
+    cleanupAllPreLaunched();
   });
 
   const handleLaunch = async () => {
@@ -163,8 +188,6 @@ export const LauncherModal = (props: LauncherModalProps) => {
       for (let i = 0; i < count; i++) sessionsToLaunch.push(type as WorkspaceLaunchItem);
     });
 
-    const preLaunchedIds = Object.values(preLaunched()).flat();
-
     try {
       if (settingsStore.rememberLastDirectory) localStorage.setItem(LAST_WORKING_DIR_KEY, selectedDir()!);
       await launchWorkspace(
@@ -172,12 +195,17 @@ export const LauncherModal = (props: LauncherModalProps) => {
         selectedDir()!, 
         sessionsToLaunch, 
         url(),
-        preLaunchedIds
+        preLaunched()
       );
       // Neutralize preLaunched map as they are now "adopted"
       setPreLaunched({ Gemini: [], Claude: [], Codex: [], OpenCode: [], WSL: [], Browser: [] });
       props.onClose();
-    } catch (_e) {
+    } catch (e: any) {
+      console.error("Launch failed:", e);
+      // Ensure we don't leave the modal in a broken state
+      // If launch failed, we might want to stay open but show an error
+      // For now, let's at least ensure we don't block the UI
+      setIsLaunching(false);
     } finally {
       setIsLaunching(false);
     }
@@ -208,6 +236,19 @@ export const LauncherModal = (props: LauncherModalProps) => {
     if (count <= 8) return { cols: 4, rows: 2 };
     if (count <= 12) return { cols: 4, rows: 3 };
     return { cols: Math.ceil(Math.sqrt(count)), rows: Math.ceil(count / Math.ceil(Math.sqrt(count))) };
+  };
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (step() === "basics" && selectedDir() && workspaceName()) {
+        setStep("swarm");
+      } else if (step() === "swarm") {
+        setStep("config");
+      } else if (step() === "config" && totalSessions() > 0 && !isLaunching()) {
+        handleLaunch();
+      }
+    }
   };
 
   return (

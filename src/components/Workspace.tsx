@@ -58,7 +58,10 @@ export const Workspace = (props: WorkspaceProps) => {
         'grid-template-columns': getGridTemplate().col,
         'grid-template-rows': getGridTemplate().row,
         background: 'transparent',
-        position: 'relative'
+        position: 'relative',
+        'min-height': 0,
+        'min-width': 0,
+        overflow: 'hidden'
       }}
     >
       <For each={sessionIds()}>
@@ -110,10 +113,20 @@ export const Workspace = (props: WorkspaceProps) => {
                 />
               </Show>
             </div>
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', 'min-height': 0 }}>
               <Show
                 when={sessionStore.sessions[sessionId]?.kind === 'browser'}
-                fallback={<TerminalWrapper id={sessionId} isActive={isActiveWorkspace()} />}
+                fallback={
+                  <>
+                    <Show when={!sessionStore.sessions[sessionId]?.pid}>
+                      <div class="terminal-loading-overlay">
+                        <div class="spinner-small" />
+                        <span>Assembling Agent...</span>
+                      </div>
+                    </Show>
+                    <TerminalWrapper id={sessionId} isActive={isActiveWorkspace()} />
+                  </>
+                }
               >
                 <BrowserPane
                   id={sessionId}
