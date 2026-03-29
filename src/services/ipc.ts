@@ -22,7 +22,7 @@ export const PRESETS: Record<string, LauncherPreset> = {
     name: 'Claude',
     command: {
       executable: 'powershell.exe',
-      args: ['-NoLogo', '-Command', '& npx @anthropic-ai/claude-code'],
+      args: ['-NoLogo', '-Command', '& claude'],
     },
     runtime: 'native',
     context: 'Native',
@@ -32,10 +32,10 @@ export const PRESETS: Record<string, LauncherPreset> = {
     name: 'WSL',
     command: {
       executable: 'wsl.exe',
-      args: ['~'],
+      args: [],
     },
     runtime: 'wsl',
-    context: 'WSL',
+    context: 'Native',
   },
   Debug: {
     id: 'debug-shell',
@@ -83,13 +83,13 @@ export type WorkspaceLaunchItem = keyof typeof PRESETS | 'Browser';
 
 export async function spawnProcess(preset: LauncherPreset): Promise<number> {
   try {
-    const pid = await invoke<number>('spawn_process', { 
+    const pid = await invoke<number>('spawn_process', {
       payload: {
         id: preset.id,
         command: preset.command,
         context: preset.context,
         cwd: preset.cwd
-      } 
+      }
     });
     return pid;
   } catch (error) {
@@ -100,20 +100,30 @@ export async function spawnProcess(preset: LauncherPreset): Promise<number> {
 
 /**
  * Batch launches a named workspace with multiple agents.
+ * Can adopt pre-launched sessions via preLaunchedIds.
  */
 export async function launchWorkspace(
   name: string,
   cwd: string,
   items: WorkspaceLaunchItem[],
-  browserUrl = 'http://localhost:3000'
+  browserUrl = 'http://localhost:3000',
+  preLaunchedIds: string[] = []
 ) {
   const workspaceId = `ws-${Date.now()}`;
-  
+  const preLaunchedQueue = [...preLaunchedIds];
+
   const launchPromises = items.map(async (item, index) => {
-    const sessionId = `${workspaceId}-${index}`;
+    // If it's a browser, or no pre-launched items of this type exist, create new ID
+    const usePreLaunched = item !== 'Browser' && preLaunchedQueue.length > 0;
+    const sessionId = usePreLaunched ? preLaunchedQueue.shift()! : `${workspaceId}-${index}`;
 
     if (item === 'Browser') {
       addBrowserSession(sessionId, browserUrl, 'Browser');
+      return sessionId;
+    }
+
+    // If it was already in the store (pre-launched), just return ID
+    if (usePreLaunched) {
       return sessionId;
     }
 
@@ -122,7 +132,7 @@ export async function launchWorkspace(
 
     const preset = { ...basePreset, id: sessionId, cwd };
     addSession(sessionId, 0, preset);
-    
+
     try {
       await spawnProcess(preset);
       return sessionId;
@@ -134,7 +144,7 @@ export async function launchWorkspace(
 
   const results = await Promise.all(launchPromises);
   const activeIds = results.filter((id): id is string => id !== null);
-  
+
   addWorkspace(workspaceId, name || "Untitled Workspace", activeIds);
   return workspaceId;
 }

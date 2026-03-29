@@ -1,5 +1,6 @@
 interface SidebarProps {
   onLaunch: () => void;
+  onOpenSettings: () => void;
 }
 
 const HexagonLogo = () => (
@@ -22,7 +23,7 @@ export const Sidebar = (props: SidebarProps) => {
         {/* PRIMARY ACTION: NEW SESSION */}
         <button
           onClick={props.onLaunch}
-          title="New Sessions"
+          title="New Sessions (Ctrl+L / Ctrl+N)"
           style={{
             width: "36px",
             height: "36px",
@@ -94,12 +95,30 @@ export const Sidebar = (props: SidebarProps) => {
         </button>
       </div>
 
-      <div style={{ "margin-top": "auto", opacity: 0.3, "padding-bottom": "1rem" }}>
+      <button
+        title="Settings (Ctrl+,)"
+        onClick={props.onOpenSettings}
+        style={{
+          "margin-top": "auto",
+          "margin-bottom": "1rem",
+          width: "36px",
+          height: "36px",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          display: "flex",
+          "align-items": "center",
+          "justify-content": "center",
+          transition: "all 0.2s ease",
+          color: "var(--text-muted)",
+          opacity: 0.6,
+        }}
+      >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"></circle>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
         </svg>
-      </div>
+      </button>
     </aside>
   );
 };

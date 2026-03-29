@@ -14,6 +14,7 @@ export interface WorkspaceSession {
   startedAt: string;
   buffer: string; // Changed to string for performance
   browserUrl?: string;
+  customName?: string; // User-defined name override
 }
 
 const MAX_BUFFER_SIZE = 50000; // Limit buffer to ~50KB to prevent memory leaks
@@ -89,7 +90,7 @@ export function renameWorkspace(id: string, name: string) {
 /**
  * Adds a new terminal session to the store.
  */
-export function addSession(id: string, pid: number, preset: LauncherPreset) {
+export function addSession(id: string, pid: number, preset: LauncherPreset, isBackground = false) {
   setStore('sessions', id, {
     id,
     kind: 'terminal',
@@ -101,7 +102,9 @@ export function addSession(id: string, pid: number, preset: LauncherPreset) {
     startedAt: new Date().toISOString(),
     buffer: '',
   });
-  setStore('activeId', id);
+  if (!isBackground) {
+    setStore('activeId', id);
+  }
 }
 
 /**
@@ -176,6 +179,13 @@ export function appendOutput(id: string, data: string) {
  */
 export function setActiveSession(id: string | null) {
   setStore('activeId', id);
+}
+
+/**
+ * Sets a custom name for a session.
+ */
+export function renameSession(id: string, name: string) {
+  setStore('sessions', id, 'customName', name);
 }
 
 /**

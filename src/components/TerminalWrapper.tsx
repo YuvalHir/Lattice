@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import { sessionStore } from "../store/sessionStore";
+import { settingsStore } from "../store/settingsStore";
 import { writeToStdin, resizeTerminal } from "../services/ipc";
 
 /**
@@ -31,7 +32,7 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
 
     term = new Terminal({
       cursorBlink: true,
-      fontSize: 13,
+      fontSize: settingsStore.terminalFontSize,
       fontFamily: "'JetBrains Mono', monospace",
       theme: {
         background: "transparent",
@@ -90,6 +91,17 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
       terminalRegistry.delete(props.id);
       term?.dispose();
     });
+  });
+
+  createEffect(() => {
+    if (!term) return;
+    term.options.fontSize = settingsStore.terminalFontSize;
+    try {
+      fitAddon?.fit();
+      term.refresh(0, Math.max(0, term.rows - 1));
+    } catch {
+      // Ignore occasional refresh race conditions.
+    }
   });
 
   createEffect(() => {

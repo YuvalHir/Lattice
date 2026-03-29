@@ -1,5 +1,5 @@
-import { For, Show } from "solid-js";
-import { sessionStore, setActiveSession } from "../store/sessionStore";
+import { For, Show, createSignal } from "solid-js";
+import { sessionStore, setActiveSession, renameSession } from "../store/sessionStore";
 import { TerminalWrapper } from "./TerminalWrapper";
 import { BrowserPane } from "./BrowserPane";
 
@@ -14,6 +14,9 @@ export const Workspace = (props: WorkspaceProps) => {
   };
 
   const sessionIds = () => workspace()?.sessionIds || [];
+
+  // Track which session is being edited
+  const [editingSessionId, setEditingSessionId] = createSignal<string | null>(null);
   
   const getGridDimensions = () => {
     const total = sessionIds().length;
@@ -60,7 +63,7 @@ export const Workspace = (props: WorkspaceProps) => {
     >
       <For each={sessionIds()}>
         {(sessionId, index) => (
-          <div 
+          <div
             class={`terminal-tile glass-pane ${sessionStore.activeId === sessionId ? 'glass-pane-active' : ''}`}
             onMouseDown={() => setActiveSession(sessionId)}
             style={{
@@ -68,7 +71,44 @@ export const Workspace = (props: WorkspaceProps) => {
             }}
           >
             <div class="tile-header">
-              {sessionStore.sessions[sessionId]?.preset.name}
+              <Show
+                when={editingSessionId() === sessionId}
+                fallback={
+                  <div
+                    class="tile-header-content"
+                    onDblClick={() => setEditingSessionId(sessionId)}
+                  >
+                    <span class="tile-header-name">
+                      {sessionStore.sessions[sessionId]?.customName || sessionStore.sessions[sessionId]?.preset.name}
+                    </span>
+                    <svg class="tile-header-edit-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                  </div>
+                }
+              >
+                <input
+                  autofocus
+                  class="tile-header-input"
+                  value={sessionStore.sessions[sessionId]?.customName || sessionStore.sessions[sessionId]?.preset.name}
+                  onBlur={(e) => {
+                    renameSession(sessionId, e.currentTarget.value);
+                    setEditingSessionId(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      renameSession(sessionId, e.currentTarget.value);
+                      setEditingSessionId(null);
+                    }
+                    if (e.key === "Escape") {
+                      setEditingSessionId(null);
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onDblClick={(e) => e.stopPropagation()}
+                />
+              </Show>
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
               <Show

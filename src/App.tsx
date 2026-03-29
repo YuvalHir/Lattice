@@ -1,16 +1,67 @@
-import { createSignal, Show, For } from "solid-js";
+import { createSignal, Show, For, onMount, onCleanup } from "solid-js";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { sessionStore, setActiveWorkspace, removeWorkspace, updateWorkspaceColor, renameWorkspace, WORKSPACE_COLORS } from "./store/sessionStore";
 import { Sidebar } from "./components/Sidebar";
 import { Workspace } from "./components/Workspace";
 import { LauncherModal } from "./components/LauncherModal";
+import { SettingsPage } from "./components/SettingsPage";
 import "./App.css";
 
 function App() {
   const appWindow = getCurrentWindow();
   const [isLauncherOpen, setIsLauncherOpen] = createSignal(false);
+  const [isSettingsOpen, setIsSettingsOpen] = createSignal(false);
   const [editingWorkspaceId, setEditingWorkspaceId] = createSignal<string | null>(null);
   const [contextMenu, setContextMenu] = createSignal<{ x: number, y: number, id: string } | null>(null);
+
+  onMount(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // Ctrl+, to toggle settings
+      if (e.ctrlKey && e.key === ",") {
+        e.preventDefault();
+        setIsSettingsOpen(prev => !prev);
+        return;
+      }
+
+      // Ctrl+L to open launcher
+      if (e.ctrlKey && e.key === "l") {
+        e.preventDefault();
+        setIsLauncherOpen(true);
+        return;
+      }
+
+      // Ctrl+N to create new workspace (opens launcher)
+      if (e.ctrlKey && e.key === "n") {
+        e.preventDefault();
+        setIsLauncherOpen(true);
+        return;
+      }
+
+      // Ctrl+W to close current workspace
+      if (e.ctrlKey && e.key === "w") {
+        e.preventDefault();
+        const activeId = sessionStore.activeWorkspaceId;
+        if (activeId) {
+          removeWorkspace(activeId);
+        }
+        return;
+      }
+
+      // Escape to close settings or launcher
+      if (e.key === "Escape") {
+        if (isSettingsOpen()) setIsSettingsOpen(false);
+        if (isLauncherOpen()) setIsLauncherOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+  });
 
   const cycleColor = (workspaceId: string, currentColor: string) => {
     const currentIndex = WORKSPACE_COLORS.indexOf(currentColor);
@@ -40,7 +91,10 @@ function App() {
   
   return (
     <div class="layout-root" onClick={() => setContextMenu(null)}>
-      <Sidebar onLaunch={() => setIsLauncherOpen(true)} />
+      <Sidebar
+        onLaunch={() => setIsLauncherOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
 
       <main class="main-content">
         {/* Browser-style Tab Bar / Custom Title Bar */}
@@ -354,10 +408,11 @@ function App() {
         </footer>
       </main>
 
-      <LauncherModal 
-        isOpen={isLauncherOpen()} 
-        onClose={() => setIsLauncherOpen(false)} 
+      <LauncherModal
+        isOpen={isLauncherOpen()}
+        onClose={() => setIsLauncherOpen(false)}
       />
+      <SettingsPage isActive={isSettingsOpen()} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 }
