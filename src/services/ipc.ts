@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn, type Event } from '@tauri-apps/api/event';
 import type { LauncherPreset, TerminalOutputPayload } from '../types/schema';
-import { addSession, terminateSession, addWorkspace, addBrowserSession } from '../store/sessionStore';
+import { addSession, terminateSession, addWorkspace, addBrowserSession, updateSessionPid } from '../store/sessionStore';
 
 /**
  * Hardcoded Launcher Presets
@@ -134,7 +134,8 @@ export async function launchWorkspace(
     addSession(sessionId, 0, preset);
 
     try {
-      await spawnProcess(preset);
+      const pid = await spawnProcess(preset);
+      updateSessionPid(sessionId, pid);
       return sessionId;
     } catch (error) {
       terminateSession(sessionId, 1);

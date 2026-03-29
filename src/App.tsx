@@ -1,5 +1,7 @@
 import { createSignal, Show, For, onMount, onCleanup } from "solid-js";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
+
 import { sessionStore, setActiveWorkspace, removeWorkspace, updateWorkspaceColor, renameWorkspace, WORKSPACE_COLORS } from "./store/sessionStore";
 import { Sidebar } from "./components/Sidebar";
 import { RightSidebar } from "./components/RightSidebar";
@@ -15,9 +17,46 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = createSignal(false);
   const [editingWorkspaceId, setEditingWorkspaceId] = createSignal<string | null>(null);
   const [contextMenu, setContextMenu] = createSignal<{ x: number, y: number, id: string } | null>(null);
+  const [memoryUsage, setMemoryUsage] = createSignal({ workspace_bytes: 0, total_bytes: 0 });
+
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0.0MB';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    // Always show at least MB
+    if (i < 2) return (bytes / Math.pow(1024, 2)).toFixed(1) + 'MB';
+    return (bytes / Math.pow(1024, i)).toFixed(1) + units[i];
+  };
 
   onMount(() => {
+    // RAM Polling
+    const interval = setInterval(async () => {
+      const activeWorkspace = sessionStore.workspaces.find(w => w.id === sessionStore.activeWorkspaceId);
+      const pids: number[] = [];
+      
+      if (activeWorkspace) {
+        activeWorkspace.sessionIds.forEach(sid => {
+          const session = sessionStore.sessions[sid];
+          if (session && session.pid > 0 && !session.isDead) {
+            pids.push(session.pid);
+          }
+        });
+      }
+
+      try {
+        const usage = await invoke<{ workspace_bytes: number, total_bytes: number }>("get_memory_usage", { 
+          workspacePids: pids 
+        });
+        setMemoryUsage(usage);
+      } catch (err) {
+        console.error("Failed to fetch memory usage:", err);
+      }
+    }, 5000);
+
+    onCleanup(() => clearInterval(interval));
+
     const handleKeyDown = (e: KeyboardEvent) => {
+
       // Don't trigger shortcuts when typing in inputs
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
@@ -212,9 +251,15 @@ function App() {
             </section>
 
             <footer style={{ height: "22px", "font-size": "10px", display: "flex", "align-items": "center", padding: "0 0.75rem", color: "var(--text-muted)", background: "#0d1117", "border-top": "1px solid var(--border-main)" }}>
-              <div style={{ display: "flex", "align-items": "center", gap: "1rem" }}><span style={{ color: "var(--accent-primary)" }}>● READY</span></div>
+              <div style={{ display: "flex", "align-items": "center", gap: "1rem" }}>
+                <span style={{ color: "var(--accent-primary)" }}>● READY</span>
+                <span style={{ "border-left": "1px solid var(--border-main)", "padding-left": "1rem", "font-family": "var(--font-mono)", "opacity": 0.8 }}>
+                  {formatBytes(memoryUsage().workspace_bytes)} / {formatBytes(memoryUsage().total_bytes)}
+                </span>
+              </div>
               <span style={{ "margin-left": "auto" }}>{sessionStore.workspaces.length} WORKSPACES ONLINE</span>
             </footer>
+
           </main>
 
           <SourceControlPanel />

@@ -8,7 +8,7 @@ import {
   settingsStore,
   type SessionType,
 } from "../store/settingsStore";
-import { addSession, terminateSession } from "../store/sessionStore";
+import { addSession, terminateSession, updateSessionPid } from "../store/sessionStore";
 
 interface LauncherModalProps {
   isOpen: boolean;
@@ -109,7 +109,8 @@ export const LauncherModal = (props: LauncherModalProps) => {
             // Add to store in background mode
             addSession(tempId, 0, preset, true);
             try {
-              await spawnProcess(preset);
+              const pid = await spawnProcess(preset);
+              updateSessionPid(tempId, pid);
               newLaunched[type] = [...newLaunched[type], tempId];
               changed = true;
             } catch (e) {

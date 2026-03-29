@@ -31,7 +31,10 @@ pub fn run() {
             commands::git_init,
             commands::git_add_all,
             commands::get_git_log,
+            commands::get_memory_usage,
         ])
+
+
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

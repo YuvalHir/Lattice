@@ -6,6 +6,14 @@ use serde::{Serialize, Deserialize};
 use crate::state::{SessionRegistry, SessionHandle, SessionStatus, ExecutionContext};
 use crate::process::spawn_with_pty;
 use std::process::Command;
+use sysinfo::{System, Pid, ProcessesToUpdate};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MemoryUsage {
+    pub workspace_bytes: u64,
+    pub total_bytes: u64,
+}
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GitFileStatus {
@@ -460,3 +468,53 @@ pub async fn get_git_log(cwd: String) -> Result<Vec<GitCommit>, String> {
 
     Ok(commits)
 }
+
+#[tauri::command]
+pub async fn get_memory_usage(workspace_pids: Vec<u32>) -> Result<MemoryUsage, String> {
+    let mut sys = System::new_all();
+    // Use the 2-argument refresh_processes signature for sysinfo 0.33.x
+    sys.refresh_processes(ProcessesToUpdate::All, true);
+
+    let current_pid = Pid::from_u32(std::process::id());
+    
+    // Total memory: Lattice (current process) and all its descendants
+    let total_bytes = get_recursive_memory(&sys, current_pid);
+
+    // Workspace memory: Sum of provided PIDs and their descendants
+    let workspace_bytes = workspace_pids.iter()
+        .map(|&pid| get_recursive_memory(&sys, Pid::from_u32(pid)))
+        .sum();
+
+
+    Ok(MemoryUsage {
+        workspace_bytes,
+        total_bytes,
+    })
+}
+
+fn get_recursive_memory(sys: &System, root_pid: Pid) -> u64 {
+    let mut total = 0;
+    let mut queue = vec![root_pid];
+    let mut visited = std::collections::HashSet::new();
+
+    while let Some(pid) = queue.pop() {
+        if !visited.insert(pid) {
+            continue;
+        }
+
+        if let Some(process) = sys.process(pid) {
+            total += process.memory();
+            
+            // Add children to queue
+            for (child_pid, child_proc) in sys.processes() {
+                if let Some(parent_pid) = child_proc.parent() {
+                    if parent_pid == pid {
+                        queue.push(*child_pid);
+                    }
+                }
+            }
+        }
+    }
+    total
+}
+

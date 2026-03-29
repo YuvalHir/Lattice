@@ -226,3 +226,10 @@ export function removeWorkspace(id: string) {
     setStore('activeWorkspaceId', store.workspaces.length > 0 ? store.workspaces[0].id : null);
   }
 }
+
+/**
+ * Updates the PID of an existing session.
+ */
+export function updateSessionPid(id: string, pid: number) {
+  setStore('sessions', id, (s) => (s ? { ...s, pid } : s));
+}
