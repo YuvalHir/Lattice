@@ -22,6 +22,7 @@ export const SourceControlPanel = () => {
   const [commitMessage, setCommitMessage] = createSignal("");
   const [isRefreshing, setIsRefreshing] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+  const [isPushOffered, setIsPushOffered] = createSignal(false);
 
   const activeWorkspace = () => 
     sessionStore.workspaces.find(w => w.id === sessionStore.activeWorkspaceId);
@@ -42,6 +43,11 @@ export const SourceControlPanel = () => {
         ]);
         setStatusList(statuses);
         setCommitLog(log);
+        
+        // If there are changes, reset the push offering
+        if (statuses.length > 0) {
+          setIsPushOffered(false);
+        }
       }
     } catch (e: any) {
       setError(e.toString());
@@ -95,7 +101,9 @@ export const SourceControlPanel = () => {
     try {
       await gitCommit(ws.cwd, commitMessage().trim());
       setCommitMessage("");
-      refreshStatus();
+      await refreshStatus();
+      // Offer push immediately after a successful commit
+      setIsPushOffered(true);
     } catch (e: any) {
       setError(e.toString());
     }
@@ -106,7 +114,9 @@ export const SourceControlPanel = () => {
     if (!ws) return;
     try {
       await gitPush(ws.cwd);
-      refreshStatus();
+      await refreshStatus();
+      // Push complete, remove the offer
+      setIsPushOffered(false);
     } catch (e: any) {
       setError(e.toString());
     }
@@ -226,7 +236,7 @@ export const SourceControlPanel = () => {
               }}
             />
             <Show 
-              when={stagedFiles().length > 0 || unstagedFiles().length > 0}
+              when={(stagedFiles().length > 0 || unstagedFiles().length > 0) || !isPushOffered()}
               fallback={
                 <button 
                   class="btn-primary" 
