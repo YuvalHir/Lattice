@@ -2,6 +2,8 @@ import { createSignal, Show, For, onMount, onCleanup } from "solid-js";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { sessionStore, setActiveWorkspace, removeWorkspace, updateWorkspaceColor, renameWorkspace, WORKSPACE_COLORS } from "./store/sessionStore";
 import { Sidebar } from "./components/Sidebar";
+import { RightSidebar } from "./components/RightSidebar";
+import { SourceControlPanel } from "./components/SourceControlPanel";
 import { Workspace } from "./components/Workspace";
 import { LauncherModal } from "./components/LauncherModal";
 import { SettingsPage } from "./components/SettingsPage";
@@ -91,13 +93,12 @@ function App() {
   
   return (
     <div class="layout-root" onClick={() => setContextMenu(null)}>
-      <Sidebar
-        onLaunch={() => setIsLauncherOpen(true)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-      />
+      {/* FULL HEIGHT LEFT SIDEBAR */}
+      <Sidebar onLaunch={() => setIsLauncherOpen(true)} onOpenSettings={() => setIsSettingsOpen(true)} />
 
-      <main class="main-content">
-        {/* Browser-style Tab Bar / Custom Title Bar */}
+      {/* VERTICAL STACK FOR HEADER + CONTENT */}
+      <div class="app-main-stack">
+        {/* GLOBAL TITLE BAR (Rest of the width) */}
         <header 
           data-tauri-drag-region
           style={{ 
@@ -105,13 +106,13 @@ function App() {
             background: "var(--bg-header)", 
             display: "flex", 
             "align-items": "flex-end", 
-            padding: "0 0.5rem",
+            padding: "0 140px 0 0.5rem",
             "border-bottom": "1px solid var(--border-main)",
             "gap": "2px",
             "user-select": "none",
             "cursor": "default",
             "position": "relative",
-            "z-index": "1000"
+            "z-index": "1002"
           }}
         >
           <For each={sessionStore.workspaces}>
@@ -139,7 +140,6 @@ function App() {
                   transition: "border-bottom 0.2s ease"
                 }}
               >
-                {/* Color Dot / Picker Trigger */}
                 <div 
                   onClick={(e) => { 
                     e.stopPropagation(); 
@@ -155,263 +155,74 @@ function App() {
                   }}
                   title="Click to cycle color"
                 />
-
-                <Show 
-                  when={editingWorkspaceId() === ws.id} 
-                  fallback={
-                    <span style={{ 
-                      "font-size": "11px", 
-                      "font-weight": "500",
-                      color: sessionStore.activeWorkspaceId === ws.id ? "var(--text-main)" : "var(--text-muted)",
-                      "white-space": "nowrap",
-                      "overflow": "hidden",
-                      "text-overflow": "ellipsis",
-                      "flex": 1
-                    }}>
-                      {ws.name}
-                    </span>
-                  }
-                >
-                  <input
-                    autofocus
-                    value={ws.name}
-                    onBlur={(e) => handleRename(ws.id, e.currentTarget.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleRename(ws.id, e.currentTarget.value);
-                      if (e.key === "Escape") setEditingWorkspaceId(null);
-                    }}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-main)",
-                      "font-size": "11px",
-                      "font-weight": "500",
-                      width: "100%",
-                      outline: "none",
-                      padding: "0"
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  />
+                <Show when={editingWorkspaceId() === ws.id} fallback={<span style={{ "font-size": "11px", "font-weight": "500", color: sessionStore.activeWorkspaceId === ws.id ? "var(--text-main)" : "var(--text-muted)", "white-space": "nowrap", "overflow": "hidden", "text-overflow": "ellipsis", "flex": 1 }}>{ws.name}</span>}>
+                  <input autofocus value={ws.name} onBlur={(e) => handleRename(ws.id, e.currentTarget.value)} onKeyDown={(e) => { if (e.key === "Enter") handleRename(ws.id, e.currentTarget.value); if (e.key === "Escape") setEditingWorkspaceId(null); }} style={{ background: "transparent", border: "none", color: "var(--text-main)", "font-size": "11px", "font-weight": "500", width: "100%", outline: "none", padding: "0" }} onClick={(e) => e.stopPropagation()} />
                 </Show>
-
-                <span 
-                  onClick={(e) => { e.stopPropagation(); removeWorkspace(ws.id); }}
-                  style={{ 
-                    "margin-left": "8px", 
-                    opacity: 0.5, 
-                    "font-size": "14px",
-                    "display": "flex",
-                    "align-items": "center"
-                  }}
-                >
-                  ×
-                </span>
+                <span onClick={(e) => { e.stopPropagation(); removeWorkspace(ws.id); }} style={{ "margin-left": "8px", opacity: 0.5, "font-size": "14px", "display": "flex", "align-items": "center" }}>×</span>
               </div>
             )}
           </For>
-          
-          <button 
-            onClick={() => setIsLauncherOpen(true)}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "var(--text-muted)",
-              padding: "0 10px",
-              height: "28px",
-              cursor: "pointer",
-              "font-size": "18px",
-              "margin-bottom": "-1px"
-            }}
-          >
-            +
-          </button>
+          <button onClick={() => setIsLauncherOpen(true)} style={{ background: "transparent", border: "none", color: "var(--text-muted)", padding: "0 10px", height: "28px", cursor: "pointer", "font-size": "18px", "margin-bottom": "-1px" }}>+</button>
 
-          {/* Window Controls */}
-          <div style={{ "margin-left": "auto", display: "flex", height: "35px", "align-items": "center", "position": "relative", "z-index": "1001" }}>
-            <div 
-              class="window-control-btn" 
-              onClick={() => appWindow.minimize()}
-              style={{
-                width: "45px",
-                height: "100%",
-                display: "flex",
-                "align-items": "center",
-                "justify-content": "center",
-                cursor: "pointer",
-                "font-size": "14px",
-                color: "var(--text-muted)"
-              }}
-            >
-              ─
-            </div>
-            <div 
-              class="window-control-btn" 
-              onClick={() => toggleMaximize()}
-              style={{
-                width: "45px",
-                height: "100%",
-                display: "flex",
-                "align-items": "center",
-                "justify-content": "center",
-                cursor: "pointer",
-                "font-size": "12px",
-                color: "var(--text-muted)"
-              }}
-            >
-              ▢
-            </div>
-            <div 
-              class="window-control-btn close" 
-              onClick={() => appWindow.close()}
-              style={{
-                width: "45px",
-                height: "100%",
-                display: "flex",
-                "align-items": "center",
-                "justify-content": "center",
-                cursor: "pointer",
-                "font-size": "16px",
-                color: "var(--text-muted)"
-              }}
-            >
-              ×
-            </div>
+          {/* Global Window Controls */}
+          <div class="window-controls-container">
+            <div class="window-control-btn" onClick={() => appWindow.minimize()} style={{ width: "45px", height: "100%", display: "flex", "align-items": "center", "justify-content": "center", cursor: "pointer", "font-size": "14px", color: "var(--text-muted)" }}>─</div>
+            <div class="window-control-btn" onClick={() => toggleMaximize()} style={{ width: "45px", height: "100%", display: "flex", "align-items": "center", "justify-content": "center", cursor: "pointer", "font-size": "12px", color: "var(--text-muted)" }}>▢</div>
+            <div class="window-control-btn close" onClick={() => appWindow.close()} style={{ width: "45px", height: "100%", display: "flex", "align-items": "center", "justify-content": "center", cursor: "pointer", "font-size": "16px", color: "var(--text-muted)" }}>×</div>
           </div>
         </header>
 
-        <section class="workspace-container" style={{ position: "relative", flex: 1 }}>
-          <For each={sessionStore.workspaces}>
-            {(ws) => (
-              <Workspace workspaceId={ws.id} />
-            )}
-          </For>
+        {/* BOTTOM CONTENT AREA */}
+        <div class="content-body">
+          <main class="main-content">
+            <section class="workspace-container" style={{ position: "relative", flex: 1 }}>
+              <For each={sessionStore.workspaces}>
+                {(ws) => <Workspace workspaceId={ws.id} />}
+              </For>
 
-          {/* Empty State */}
-          <Show when={sessionStore.workspaces.length === 0}>
-            <div style={{
-              display: "flex",
-              "flex-direction": "column",
-              "align-items": "center",
-              "justify-content": "center",
-              height: "100%",
-              background: "var(--bg-app)"
-            }}>
-              <div style={{ opacity: 0.2, "margin-bottom": "1rem" }}>
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2L20.6603 7V17L12 22L3.33975 17V7L12 2Z" stroke="var(--text-main)" stroke-width="1"/>
-                </svg>
-              </div>
-              <h2 style={{ "font-weight": "500", "font-size": "1.2rem", color: "var(--text-muted)" }}>LATTICE</h2>
-              <p style={{ color: "#484f58", "font-size": "0.85rem", "margin-top": "0.5rem" }}>
-                Select '+' to configure a new workspace.
-              </p>
-            </div>
-          </Show>
-
-          {/* Context Menu Overlay */}
-          <Show when={contextMenu()}>
-            <div 
-              style={{
-                position: "fixed",
-                top: `${contextMenu()!.y}px`,
-                left: `${contextMenu()!.x}px`,
-                background: "#1c2128",
-                border: "1px solid var(--border-main)",
-                "border-radius": "8px",
-                "box-shadow": "0 8px 32px rgba(0,0,0,0.6)",
-                "z-index": 1000,
-                padding: "6px",
-                "min-width": "160px"
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div 
-                class="context-menu-item"
-                onClick={() => {
-                  setEditingWorkspaceId(contextMenu()!.id);
-                  setContextMenu(null);
-                }}
-              >
-                <span>✎</span> Rename
-              </div>
-              
-              <div style={{ height: "1px", background: "var(--border-main)", margin: "6px 4px" }} />
-              
-              <div style={{ padding: "8px 10px 4px 10px" }}>
-                <div style={{ 
-                  "font-size": "9px", 
-                  "font-weight": "bold", 
-                  color: "var(--text-muted)", 
-                  "margin-bottom": "8px", 
-                  "text-transform": "uppercase", 
-                  "letter-spacing": "0.05em" 
-                }}>
-                  Workspace Color
+              <Show when={sessionStore.workspaces.length === 0}>
+                <div style={{ display: "flex", "flex-direction": "column", "align-items": "center", "justify-content": "center", height: "100%", background: "var(--bg-app)" }}>
+                  <div style={{ opacity: 0.2, "margin-bottom": "1rem" }}>
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12 2L20.6603 7V17L12 22L3.33975 17V7L12 2Z" stroke="var(--text-main)" stroke-width="1"/>
+                    </svg>
+                  </div>
+                  <h2 style={{ "font-weight": "500", "font-size": "1.2rem", color: "var(--text-muted)" }}>LATTICE</h2>
+                  <p style={{ color: "#484f58", "font-size": "0.85rem", "margin-top": "0.5rem" }}>Select '+' to configure a new workspace.</p>
                 </div>
-                <div style={{ display: "grid", "grid-template-columns": "repeat(4, 1fr)", gap: "6px" }}>
-                  <For each={WORKSPACE_COLORS}>
-                    {(color) => (
-                      <div 
-                        onClick={() => {
-                          updateWorkspaceColor(contextMenu()!.id, color);
-                          setContextMenu(null);
-                        }}
-                        style={{
-                          width: "24px",
-                          height: "24px",
-                          "border-radius": "4px",
-                          background: color,
-                          cursor: "pointer",
-                          border: sessionStore.workspaces.find(w => w.id === contextMenu()?.id)?.color === color ? "2px solid white" : "1px solid rgba(255,255,255,0.1)",
-                          "box-shadow": `0 0 10px ${color}33`,
-                          transition: "transform 0.1s ease"
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.15)"}
-                        onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-                      />
-                    )}
-                  </For>
+              </Show>
+
+              {/* Context Menu Overlay */}
+              <Show when={contextMenu()}>
+                <div style={{ position: "fixed", top: `${contextMenu()!.y}px`, left: `${contextMenu()!.x}px`, background: "#1c2128", border: "1px solid var(--border-main)", "border-radius": "8px", "box-shadow": "0 8px 32px rgba(0,0,0,0.6)", "z-index": 1000, padding: "6px", "min-width": "160px" }} onClick={(e) => e.stopPropagation()}>
+                  <div class="context-menu-item" onClick={() => { setEditingWorkspaceId(contextMenu()!.id); setContextMenu(null); }}><span>✎</span> Rename</div>
+                  <div style={{ height: "1px", background: "var(--border-main)", margin: "6px 4px" }} />
+                  <div style={{ padding: "8px 10px 4px 10px" }}>
+                    <div style={{ "font-size": "9px", "font-weight": "bold", color: "var(--text-muted)", "margin-bottom": "8px", "text-transform": "uppercase", "letter-spacing": "0.05em" }}>Workspace Color</div>
+                    <div style={{ display: "grid", "grid-template-columns": "repeat(4, 1fr)", gap: "6px" }}>
+                      <For each={WORKSPACE_COLORS}>
+                        {(color) => <div onClick={() => { updateWorkspaceColor(contextMenu()!.id, color); setContextMenu(null); }} style={{ width: "24px", height: "24px", "border-radius": "4px", background: color, cursor: "pointer", border: sessionStore.workspaces.find(w => w.id === contextMenu()?.id)?.color === color ? "2px solid white" : "1px solid rgba(255,255,255,0.1)", "box-shadow": `0 0 10px ${color}33`, transition: "transform 0.1s ease" }} onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.15)"} onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"} />}
+                      </For>
+                    </div>
+                  </div>
+                  <div style={{ height: "1px", background: "var(--border-main)", margin: "8px 4px 6px 4px" }} />
+                  <div class="context-menu-item danger" onClick={() => { removeWorkspace(contextMenu()!.id); setContextMenu(null); }}><span>🗑</span> Close Workspace</div>
                 </div>
-              </div>
+              </Show>
+            </section>
 
-              <div style={{ height: "1px", background: "var(--border-main)", margin: "8px 4px 6px 4px" }} />
-              
-              <div 
-                class="context-menu-item danger"
-                onClick={() => {
-                  removeWorkspace(contextMenu()!.id);
-                  setContextMenu(null);
-                }}
-              >
-                <span>🗑</span> Close Workspace
-              </div>
-            </div>
-          </Show>
-        </section>
+            <footer style={{ height: "22px", "font-size": "10px", display: "flex", "align-items": "center", padding: "0 0.75rem", color: "var(--text-muted)", background: "#0d1117", "border-top": "1px solid var(--border-main)" }}>
+              <div style={{ display: "flex", "align-items": "center", gap: "1rem" }}><span style={{ color: "var(--accent-primary)" }}>● READY</span></div>
+              <span style={{ "margin-left": "auto" }}>{sessionStore.workspaces.length} WORKSPACES ONLINE</span>
+            </footer>
+          </main>
 
-        <footer style={{ 
-          height: "22px", 
-          "font-size": "10px", 
-          display: "flex", 
-          "align-items": "center", 
-          padding: "0 0.75rem", 
-          color: "var(--text-muted)",
-          background: "#0d1117",
-          "border-top": "1px solid var(--border-main)"
-        }}>
-          <div style={{ display: "flex", "align-items": "center", gap: "1rem" }}>
-            <span style={{ color: "var(--accent-primary)" }}>● READY</span>
-          </div>
-          <span style={{ "margin-left": "auto" }}>
-            {sessionStore.workspaces.length} WORKSPACES ONLINE
-          </span>
-        </footer>
-      </main>
+          <SourceControlPanel />
+          <RightSidebar />
+        </div>
+      </div>
 
-      <LauncherModal
-        isOpen={isLauncherOpen()}
-        onClose={() => setIsLauncherOpen(false)}
-      />
+      <LauncherModal isOpen={isLauncherOpen()} onClose={() => setIsLauncherOpen(false)} />
       <SettingsPage isActive={isSettingsOpen()} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );

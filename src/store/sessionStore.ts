@@ -25,6 +25,7 @@ export interface WorkspaceInstance {
   sessionIds: string[];
   layout: 'auto';
   color: string;
+  cwd: string; // Workspace root directory
 }
 
 export const WORKSPACE_COLORS = [
@@ -43,6 +44,7 @@ interface SessionStore {
   workspaces: WorkspaceInstance[];
   activeWorkspaceId: string | null;
   activeId: string | null; // Focus inside workspace
+  isSourceControlOpen: boolean;
 }
 
 const [store, setStore] = createStore<SessionStore>({
@@ -50,6 +52,7 @@ const [store, setStore] = createStore<SessionStore>({
   workspaces: [],
   activeWorkspaceId: null,
   activeId: null,
+  isSourceControlOpen: false,
 });
 
 export const sessionStore = store;
@@ -57,7 +60,7 @@ export const sessionStore = store;
 /**
  * Adds a new workspace or adds a session to an existing one.
  */
-export function addWorkspace(id: string, name: string, sessionIds: string[]) {
+export function addWorkspace(id: string, name: string, sessionIds: string[], cwd: string) {
   const usedColors = store.workspaces.map(w => w.color);
   const availableColors = WORKSPACE_COLORS.filter(c => !usedColors.includes(c));
   
@@ -65,12 +68,15 @@ export function addWorkspace(id: string, name: string, sessionIds: string[]) {
   const color = availableColors.length > 0 
     ? availableColors[0] 
     : WORKSPACE_COLORS[store.workspaces.length % WORKSPACE_COLORS.length];
-
   setStore('workspaces', (prev) => [
     ...prev,
-    { id, name, sessionIds, layout: 'auto', color }
+    { id, name, sessionIds, layout: 'auto', color, cwd }
   ]);
   setStore('activeWorkspaceId', id);
+}
+
+export function toggleSourceControl() {
+  setStore('isSourceControlOpen', (prev) => !prev);
 }
 
 /**

@@ -22,6 +22,15 @@ pub fn run() {
             commands::write_to_stdin,
             commands::kill_process,
             commands::resize_terminal,
+            commands::get_git_info,
+            commands::git_status,
+            commands::git_add,
+            commands::git_unstage,
+            commands::git_commit,
+            commands::git_push,
+            commands::git_init,
+            commands::git_add_all,
+            commands::get_git_log,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

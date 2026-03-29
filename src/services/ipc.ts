@@ -145,7 +145,7 @@ export async function launchWorkspace(
   const results = await Promise.all(launchPromises);
   const activeIds = results.filter((id): id is string => id !== null);
 
-  addWorkspace(workspaceId, name || "Untitled Workspace", activeIds);
+  addWorkspace(workspaceId, name || "Untitled Workspace", activeIds, cwd);
   return workspaceId;
 }
 
@@ -175,4 +175,59 @@ export async function listenToProcessExit(
   return await listen<{ id: string, exit_code: number | null }>('process-exit', (event) => {
     callback(event.payload);
   });
+}
+
+// GIT COMMANDS
+export interface GitFileStatus {
+  path: string;
+  status: string;
+  staged: boolean;
+}
+
+export interface GitInfo {
+  is_repo: boolean;
+  branch: string;
+}
+
+export interface GitCommit {
+  hash: string;
+  author: string;
+  date: string;
+  message: string;
+}
+
+export async function getGitInfo(cwd: string) {
+  return await invoke<GitInfo>('get_git_info', { cwd });
+}
+
+export async function gitStatus(cwd: string) {
+  return await invoke<GitFileStatus[]>('git_status', { cwd });
+}
+
+export async function gitAdd(cwd: string, path: string) {
+  return await invoke<void>('git_add', { cwd, path });
+}
+
+export async function gitAddAll(cwd: string) {
+  return await invoke<void>('git_add_all', { cwd });
+}
+
+export async function gitUnstage(cwd: string, path: string) {
+  return await invoke<void>('git_unstage', { cwd, path });
+}
+
+export async function gitCommit(cwd: string, message: string) {
+  return await invoke<void>('git_commit', { cwd, message });
+}
+
+export async function gitPush(cwd: string) {
+  return await invoke<void>('git_push', { cwd });
+}
+
+export async function gitInit(cwd: string) {
+  return await invoke<void>('git_init', { cwd });
+}
+
+export async function getGitLog(cwd: string) {
+  return await invoke<GitCommit[]>('get_git_log', { cwd });
 }

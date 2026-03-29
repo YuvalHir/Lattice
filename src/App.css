@@ -16,6 +16,7 @@
   --text-muted: #8b949e;
   
   --sidebar-width: 50px;
+  --sidebar-right-width: 40px;
 }
 
 * {
@@ -30,6 +31,29 @@ body {
   color: var(--text-main);
   height: 100vh;
   width: 100vw;
+  overflow: hidden;
+}
+
+.layout-root {
+  display: flex;
+  flex-direction: row;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.app-main-stack {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.content-body {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
   overflow: hidden;
 }
 
@@ -798,6 +822,152 @@ body {
   border-radius: 50%;
   cursor: pointer;
   transition: transform 0.15s ease;
+}
+
+/* Source Control Panel - Far Right */
+.source-control-panel-right {
+  border-left: 1px solid var(--border-main);
+  user-select: none;
+  height: 100vh;
+}
+
+.git-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.git-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+}
+
+.scm-section-header {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  padding-left: 4px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.scm-file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  transition: background 0.1s ease;
+  cursor: default;
+}
+
+.scm-file-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.scm-status-icon {
+  font-size: 10px;
+  font-weight: 800;
+  width: 14px;
+  text-align: center;
+}
+
+.scm-status-icon.status-M { color: #e2c08d; } /* Modified */
+.scm-status-icon.status-A { color: #7ee787; } /* Added */
+.scm-status-icon.status-D { color: #f85149; } /* Deleted */
+.scm-status-icon.status-U { color: #d19a66; } /* Untracked */
+
+.scm-file-path {
+  font-size: 12px;
+  color: var(--text-main);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scm-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  opacity: 0;
+  transition: all 0.1s ease;
+}
+
+.scm-file-item:hover .scm-action-btn {
+  opacity: 1;
+}
+
+.scm-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+}
+
+/* Recent Commits History */
+.scm-commit-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.scm-commit-item:active {
+  background: rgba(88, 166, 255, 0.1);
+}
+
+/* Right Sidebar */
+.right-sidebar {
+  width: var(--sidebar-right-width);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 0;
+  background: var(--bg-sidebar);
+  border-left: 1px solid var(--border-main);
+  z-index: 1000;
+}
+
+/* Custom Professional Scrollbar (Campbell Theme) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--border-main);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
+
+.window-controls-container {
+  display: flex;
+  height: 35px;
+  align-items: center;
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 1001;
 }
 
 .settings-slider::-webkit-slider-thumb:hover {
