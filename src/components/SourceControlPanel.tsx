@@ -225,14 +225,27 @@ export const SourceControlPanel = () => {
                 "font-family": "inherit"
               }}
             />
-            <button 
-              class="btn-primary" 
-              style={{ width: "100%", "margin-top": "8px" }}
-              disabled={!commitMessage().trim() || stagedFiles().length === 0}
-              onClick={handleCommit}
+            <Show 
+              when={stagedFiles().length > 0 || unstagedFiles().length > 0}
+              fallback={
+                <button 
+                  class="btn-primary" 
+                  style={{ width: "100%", "margin-top": "8px", background: "var(--accent-primary)" }}
+                  onClick={handlePush}
+                >
+                  Push Changes
+                </button>
+              }
             >
-              Commit
-            </button>
+              <button 
+                class="btn-primary" 
+                style={{ width: "100%", "margin-top": "8px" }}
+                disabled={!commitMessage().trim() || stagedFiles().length === 0}
+                onClick={handleCommit}
+              >
+                Commit
+              </button>
+            </Show>
           </div>
 
           <Show when={error()}>
