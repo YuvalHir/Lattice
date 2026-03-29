@@ -69,8 +69,12 @@ pub async fn spawn_process(
     payload: LauncherPreset,
 ) -> Result<u32, String> {
     println!(
-        "[BACKEND] spawn_process start id={} cwd={:?} cmd={}",
-        payload.id, payload.cwd, payload.command.executable
+        "[BACKEND] spawn_process start id={} cwd={:?} context={:?} cmd={} args={:?}",
+        payload.id,
+        payload.cwd,
+        payload.context,
+        payload.command.executable,
+        payload.command.args
     );
 
     // Aggressive logging for debug

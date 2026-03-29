@@ -1,0 +1,39 @@
+{
+  "categories": [
+    {
+      "title": "🚀 Features",
+      "labels": ["feat", "feature"]
+    },
+    {
+      "title": "🐛 Fixes",
+      "labels": ["fix", "bug"]
+    },
+    {
+      "title": "🧱 Refactors",
+      "labels": ["refactor"]
+    },
+    {
+      "title": "📖 Documentation",
+      "labels": ["docs", "doc"]
+    },
+    {
+      "title": "🧪 Tests",
+      "labels": ["test"]
+    },
+    {
+      "title": "📦 Dependencies",
+      "labels": ["chore(deps)", "dependencies"]
+    }
+  ],
+  "ignore_labels": [
+    "ignore"
+  ],
+  "template": "${{CHANGELOG}}\n\n<details>\n<summary><b>Full Commit History</b></summary>\n\n${{COMMITS}}\n</details>",
+  "empty_template": "No significant changes since the last release.",
+  "label_extractor": [
+    {
+      "pattern": "^(feat|feature|fix|bug|refactor|docs|doc|test|chore|dependencies|style|ci|build|perf)(\\(.*\\))?:.*",
+      "target": "$1"
+    }
+  ]
+}

@@ -1,14 +1,15 @@
-import { createEffect, createSignal, For, Show, onMount, onCleanup, JSX } from "solid-js";
+import { createEffect, createSignal, For, Show, onMount, onCleanup, JSX, on } from "solid-js";
 import { open } from "@tauri-apps/plugin-dialog";
 import { homeDir } from "@tauri-apps/api/path";
 import { launchWorkspace, spawnProcess, killProcess, type WorkspaceLaunchItem, PRESETS } from "../services/ipc";
+import type { ExecutionContext } from "../types/schema";
 import {
   LAST_WORKING_DIR_KEY,
   SESSION_TYPES,
   settingsStore,
   type SessionType,
 } from "../store/settingsStore";
-import { addSession, terminateSession, updateSessionPid } from "../store/sessionStore";
+import { addSession, terminateSession, updateSessionPid, removeSession } from "../store/sessionStore";
 
 interface LauncherModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ interface LauncherModalProps {
 
 type SessionCounts = Record<SessionType, number>;
 type Step = "basics" | "swarm" | "config";
+const PRELAUNCH_RETRY_BACKOFF_MS = 3000;
 
 const AGENT_ICONS: Record<SessionType, JSX.Element> = {
   Gemini: (
@@ -71,9 +73,23 @@ export const LauncherModal = (props: LauncherModalProps) => {
   const [preLaunched, setPreLaunched] = createSignal<Record<SessionType, string[]>>({
     Gemini: [], Claude: [], Codex: [], OpenCode: [], WSL: [], Browser: []
   });
+
+  const [shellOverrides, setShellOverrides] = createSignal<Record<SessionType, ExecutionContext>>({
+    Gemini: "Native", 
+    Claude: "Native", 
+    Codex: "Native", 
+    OpenCode: "Native", 
+    WSL: "WSL", 
+    Browser: "Native"
+  });
+  
+  const [showAdvanced, setShowAdvanced] = createSignal(false);
   
   // Track how many are currently in the process of spawning to prevent duplicates
   const [spawningCounts, setSpawningCounts] = createSignal<Record<SessionType, number>>({
+    Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0
+  });
+  const [retryAfterTs, setRetryAfterTs] = createSignal<Record<SessionType, number>>({
     Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0
   });
 
@@ -92,7 +108,7 @@ export const LauncherModal = (props: LauncherModalProps) => {
 
   // PREDICTIVE LAUNCHING EFFECT
   createEffect(() => {
-    if (!props.isOpen || step() === "basics") return;
+    if (!props.isOpen || step() === "basics" || isLaunching()) return;
 
     const currentDir = selectedDir();
     if (!currentDir) return;
@@ -112,20 +128,32 @@ export const LauncherModal = (props: LauncherModalProps) => {
     const counts = sessionCounts();
     const launched = preLaunched();
     const spawning = spawningCounts();
+    const overrides = shellOverrides();
+    const retryAfter = retryAfterTs();
+    const now = Date.now();
 
     for (const type of SESSION_TYPES) {
-      if (type === "Browser") continue;
+      // Gemini is intentionally excluded from predictive prelaunch.
+      // Its startup TUI behaves more reliably when spawned directly
+      // at workspace launch (foreground) instead of hidden prelaunch.
+      if (type === "Browser" || type === "Gemini") continue;
 
       const targetCount = counts[type];
       const currentCount = launched[type].length + spawning[type];
+      const canRetry = now >= retryAfter[type];
 
-      if (currentCount < targetCount) {
+      if (currentCount < targetCount && canRetry) {
         const diff = targetCount - currentCount;
         for (let i = 0; i < diff; i++) {
           const tempId = `temp-${type}-${Math.random().toString(36).slice(2, 9)}`;
           const basePreset = PRESETS[type];
           if (basePreset) {
-            const preset = { ...basePreset, id: tempId, cwd: currentDir };
+            const preset = { 
+              ...basePreset, 
+              id: tempId, 
+              cwd: currentDir,
+              context: overrides[type] || basePreset.context 
+            };
             
             // Mark as spawning
             setSpawningCounts(prev => ({ ...prev, [type]: prev[type] + 1 }));
@@ -133,9 +161,14 @@ export const LauncherModal = (props: LauncherModalProps) => {
             
             spawnProcess(preset).then(pid => {
               updateSessionPid(tempId, pid);
+              setRetryAfterTs(prev => ({ ...prev, [type]: 0 }));
               setPreLaunched(prev => ({ ...prev, [type]: [...prev[type], tempId] }));
-            }).catch(() => {
-              terminateSession(tempId, 1);
+            }).catch((err) => {
+              // Failed prelaunch sessions are temporary; fully remove to avoid
+              // unbounded dead-session growth in memory under repeated failures.
+              removeSession(tempId);
+              setRetryAfterTs(prev => ({ ...prev, [type]: Date.now() + PRELAUNCH_RETRY_BACKOFF_MS }));
+              console.error(`[LAUNCHER] Prelaunch spawn failed for ${type}. Backing off ${PRELAUNCH_RETRY_BACKOFF_MS}ms.`, err);
             }).finally(() => {
               // Mark as no longer spawning
               setSpawningCounts(prev => ({ ...prev, [type]: Math.max(0, prev[type] - 1) }));
@@ -160,6 +193,15 @@ export const LauncherModal = (props: LauncherModalProps) => {
     }
   });
 
+  // Effect to purge pre-launched agents if shell overrides change
+  createEffect(on(shellOverrides, () => {
+    // React only when shell overrides themselves change.
+    if (preLaunchedCwd()) {
+      console.log("[LAUNCHER] Shell overrides changed. Purging pre-launched agents.");
+      cleanupAllPreLaunched();
+    }
+  }, { defer: true }));
+
   // CLEANUP ON DISMISS
   const cleanupAllPreLaunched = async () => {
     const allIds = Object.values(preLaunched()).flat();
@@ -169,6 +211,7 @@ export const LauncherModal = (props: LauncherModalProps) => {
     }
     setPreLaunched({ Gemini: [], Claude: [], Codex: [], OpenCode: [], WSL: [], Browser: [] });
     setSpawningCounts({ Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0 });
+    setRetryAfterTs({ Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0 });
   };
 
   onMount(() => {
@@ -202,9 +245,6 @@ export const LauncherModal = (props: LauncherModalProps) => {
       props.onClose();
     } catch (e: any) {
       console.error("Launch failed:", e);
-      // Ensure we don't leave the modal in a broken state
-      // If launch failed, we might want to stay open but show an error
-      // For now, let's at least ensure we don't block the UI
       setIsLaunching(false);
     } finally {
       setIsLaunching(false);
@@ -362,6 +402,39 @@ export const LauncherModal = (props: LauncherModalProps) => {
                   </div>
                 </Show>
                 
+                <div style={{ "margin-bottom": "1rem" }}>
+                  <button 
+                    onClick={() => setShowAdvanced(!showAdvanced())}
+                    style={{ background: "transparent", border: "none", color: "var(--accent-primary)", "font-size": "11px", "font-weight": "600", cursor: "pointer", padding: 0 }}
+                  >
+                    {showAdvanced() ? "− Hide Advanced Options" : "+ Show Advanced Shell Overrides"}
+                  </button>
+                  
+                  <Show when={showAdvanced()}>
+                    <div style={{ "margin-top": "0.75rem", display: "flex", "flex-direction": "column", gap: "8px", background: "rgba(255,255,255,0.02)", padding: "10px", "border-radius": "6px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                      <span class="launcher-label" style={{ "font-size": "9px" }}>Per-Agent Shell Overrides</span>
+                      <For each={SESSION_TYPES.filter(t => t !== "Browser" && sessionCounts()[t] > 0)}>
+                        {(type) => (
+                          <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "8px" }}>
+                            <span style={{ "font-size": "11px", "flex": 1 }}>{type} Shell:</span>
+                            <select 
+                              value={shellOverrides()[type]} 
+                              onChange={(e) => setShellOverrides(prev => ({ ...prev, [type]: e.currentTarget.value as ExecutionContext }))}
+                              style={{ background: "#0d1117", border: "1px solid var(--border-main)", color: "var(--text-main)", "font-size": "10px", padding: "2px 4px", "border-radius": "4px" }}
+                            >
+                              <option value="Native">Global Default</option>
+                              <option value="PowerShell">PowerShell</option>
+                              <option value="CMD">CMD</option>
+                              <option value="WSL">WSL</option>
+                            </select>
+                          </div>
+                        )}
+                      </For>
+                      <p style={{ "font-size": "9px", color: "var(--text-muted)", "margin": 0 }}>Changes here will purge and restart pre-launched agents.</p>
+                    </div>
+                  </Show>
+                </div>
+
                 <div style={{ background: "rgba(255,255,255,0.03)", padding: "1rem", "border-radius": "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
                   <span class="launcher-label" style={{ "margin-bottom": "8px", display: "block" }}>Configuration Summary</span>
                   <div style={{ "font-size": "12px", display: "grid", "grid-template-columns": "1fr 1fr", gap: "4px" }}>

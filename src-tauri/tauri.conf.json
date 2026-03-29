@@ -23,6 +23,15 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVFNDVBNERDQ0E2NEJCMzUKUldRMXUyVEszS1JGWGlseWs4d21YcjcrekxOR2V5L1BlUkJENTA2dEl3bnBnbGVEcHAwZzBXTTcK",
+      "endpoints": [
+        "https://github.com/yuval/lattice/releases/latest/download/latest.json"
+      ]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",

@@ -11,6 +11,7 @@ export interface AppSettings {
   defaultBrowserUrl: string;
   rememberLastDirectory: boolean;
   terminalFontSize: number;
+  defaultShell: "PowerShell" | "CMD" | "WSL" | "Native";
   defaultSessionCounts: Record<SessionType, number>;
 }
 
@@ -19,6 +20,7 @@ export const defaultSettings: AppSettings = {
   defaultBrowserUrl: "http://localhost:3000",
   rememberLastDirectory: true,
   terminalFontSize: 13,
+  defaultShell: "PowerShell",
   defaultSessionCounts: {
     Gemini: 1,
     Claude: 1,
@@ -55,6 +57,11 @@ function sanitizeSettings(raw: unknown): AppSettings {
       typeof candidate.terminalFontSize === "number"
         ? Math.min(24, Math.max(10, Math.round(candidate.terminalFontSize)))
         : defaultSettings.terminalFontSize,
+    defaultShell:
+      typeof candidate.defaultShell === "string" &&
+      ["PowerShell", "CMD", "WSL", "Native"].includes(candidate.defaultShell)
+        ? (candidate.defaultShell as any)
+        : defaultSettings.defaultShell,
     defaultSessionCounts: {
       Gemini: Math.max(0, Number(sessionCounts.Gemini ?? defaultSettings.defaultSessionCounts.Gemini)),
       Claude: Math.max(0, Number(sessionCounts.Claude ?? defaultSettings.defaultSessionCounts.Claude)),

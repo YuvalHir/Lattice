@@ -2,7 +2,11 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn, type Event } from '@tauri-apps/api/event';
 import type { LauncherPreset, TerminalOutputPayload } from '../types/schema';
 import { addSession, terminateSession, addWorkspace, addBrowserSession, updateSessionPid } from '../store/sessionStore';
+import { settingsStore } from '../store/settingsStore';
 
+/**
+ * Hardcoded Launcher Presets
+ */
 /**
  * Hardcoded Launcher Presets
  */
@@ -11,8 +15,8 @@ export const PRESETS: Record<string, LauncherPreset> = {
     id: 'gemini-cli',
     name: 'Gemini',
     command: {
-      executable: 'powershell.exe',
-      args: ['-NoLogo', '-Command', '& gemini'],
+      executable: 'gemini',
+      args: [],
     },
     runtime: 'native',
     context: 'Native',
@@ -21,8 +25,8 @@ export const PRESETS: Record<string, LauncherPreset> = {
     id: 'claude-code',
     name: 'Claude',
     command: {
-      executable: 'powershell.exe',
-      args: ['-NoLogo', '-Command', '& claude'],
+      executable: 'claude',
+      args: [],
     },
     runtime: 'native',
     context: 'Native',
@@ -31,17 +35,17 @@ export const PRESETS: Record<string, LauncherPreset> = {
     id: 'wsl-bash',
     name: 'WSL',
     command: {
-      executable: 'wsl.exe',
+      executable: '', // Empty command for interactive shell
       args: [],
     },
     runtime: 'wsl',
-    context: 'Native',
+    context: 'WSL',
   },
   Debug: {
     id: 'debug-shell',
     name: 'Debug',
     command: {
-      executable: 'powershell.exe',
+      executable: '',
       args: [],
     },
     runtime: 'native',
@@ -51,8 +55,8 @@ export const PRESETS: Record<string, LauncherPreset> = {
     id: 'ping-test',
     name: 'Ping-Test',
     command: {
-      executable: 'C:\\Windows\\System32\\cmd.exe',
-      args: ['/C', 'ping', 'google.com', '-t'],
+      executable: 'ping',
+      args: ['google.com', '-t'],
     },
     runtime: 'native',
     context: 'Native',
@@ -61,8 +65,8 @@ export const PRESETS: Record<string, LauncherPreset> = {
     id: 'codex-cli',
     name: 'Codex',
     command: {
-      executable: 'powershell.exe',
-      args: ['-NoLogo', '-Command', '& codex'],
+      executable: 'codex',
+      args: [],
     },
     runtime: 'native',
     context: 'Native',
@@ -71,8 +75,8 @@ export const PRESETS: Record<string, LauncherPreset> = {
     id: 'opencode-cli',
     name: 'OpenCode',
     command: {
-      executable: 'powershell.exe',
-      args: ['-NoLogo', '-Command', '& opencode'],
+      executable: 'opencode',
+      args: [],
     },
     runtime: 'native',
     context: 'Native',
@@ -94,7 +98,8 @@ export async function spawnProcess(preset: LauncherPreset): Promise<number> {
       payload: {
         id: preset.id,
         command: preset.command,
-        context: preset.context,
+        // Use defaultShell from settings if context is Native
+        context: preset.context === 'Native' ? settingsStore.defaultShell : preset.context,
         cwd: preset.cwd
       }
     });

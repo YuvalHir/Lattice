@@ -6,7 +6,9 @@ use portable_pty::PtyPair;
 /// Represents the execution context for a session.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ExecutionContext {
-    Native,
+    Native, // Default OS shell
+    PowerShell,
+    CMD,
     WSL,
 }
 

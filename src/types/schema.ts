@@ -1,7 +1,7 @@
 /**
  * Execution Context for the session.
  */
-export type ExecutionContext = 'Native' | 'WSL';
+export type ExecutionContext = 'Native' | 'PowerShell' | 'CMD' | 'WSL';
 
 /**
  * Launcher Preset Interface

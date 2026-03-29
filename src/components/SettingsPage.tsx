@@ -141,6 +141,23 @@ export const SettingsPage = (props: SettingsPageProps) => {
 
         <div class="settings-item">
           <div class="settings-item-header">
+            <label class="settings-item-label">Default Shell</label>
+            <span class="settings-item-id">terminal.defaultShell</span>
+          </div>
+          <select
+            class="settings-select"
+            value={draft().defaultShell}
+            onChange={(e) => setDraft((prev) => ({ ...prev, defaultShell: e.currentTarget.value as any }))}
+          >
+            <option value="PowerShell">PowerShell</option>
+            <option value="CMD">Command Prompt (CMD)</option>
+            <option value="WSL">WSL (Windows Subsystem for Linux)</option>
+            <option value="Native">System Default</option>
+          </select>
+        </div>
+
+        <div class="settings-item">
+          <div class="settings-item-header">
             <label class="settings-item-label">Remember Last Directory</label>
             <span class="settings-item-id">terminal.rememberDirectory</span>
           </div>
