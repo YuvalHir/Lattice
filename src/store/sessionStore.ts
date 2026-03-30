@@ -15,6 +15,7 @@ export interface WorkspaceSession {
   buffer: string; // Changed to string for performance
   browserUrl?: string;
   customName?: string; // User-defined name override
+  isBackground?: boolean;
 }
 
 const MAX_BUFFER_SIZE = 50000; // Limit buffer to ~50KB to prevent memory leaks
@@ -39,12 +40,26 @@ export const WORKSPACE_COLORS = [
   "#8BE9FD", // Light Blue
 ];
 
+export interface ServiceInfo {
+  name: string;
+  pid: number;
+  ports: number[];
+  cwd: string;
+  executable: string;
+  is_managed: boolean;
+  session_id: string | null;
+}
+
 interface SessionStore {
   sessions: Record<string, WorkspaceSession>;
   workspaces: WorkspaceInstance[];
   activeWorkspaceId: string | null;
   activeId: string | null; // Focus inside workspace
   isSourceControlOpen: boolean;
+  isExplorerOpen: boolean;
+  isServerManagerOpen: boolean;
+  services: ServiceInfo[];
+  externalNames: Record<number, string>; // Custom names for external services by PID
 }
 
 const [store, setStore] = createStore<SessionStore>({
@@ -53,6 +68,10 @@ const [store, setStore] = createStore<SessionStore>({
   activeWorkspaceId: null,
   activeId: null,
   isSourceControlOpen: false,
+  isExplorerOpen: false,
+  isServerManagerOpen: false,
+  services: [],
+  externalNames: {},
 });
 
 export const sessionStore = store;
@@ -79,6 +98,24 @@ export function addWorkspace(id: string, name: string, sessionIds: string[], cwd
 
 export function toggleSourceControl() {
   setStore('isSourceControlOpen', (prev) => !prev);
+  if (store.isSourceControlOpen) {
+    setStore('isExplorerOpen', false);
+  }
+}
+
+export function toggleExplorer() {
+  setStore('isExplorerOpen', (prev) => !prev);
+  if (store.isExplorerOpen) {
+    setStore('isSourceControlOpen', false);
+  }
+}
+
+export function toggleServerManager() {
+  setStore('isServerManagerOpen', (prev) => !prev);
+}
+
+export function updateServices(services: ServiceInfo[]) {
+  setStore('services', services);
 }
 
 /**
@@ -109,6 +146,7 @@ export function addSession(id: string, pid: number, preset: LauncherPreset, isBa
     exitCode: null,
     startedAt: new Date().toISOString(),
     buffer: '',
+    isBackground,
   });
   if (!isBackground) {
     setStore('activeId', id);
@@ -142,6 +180,7 @@ export function addBrowserSession(id: string, url: string, name = 'Browser') {
     startedAt: new Date().toISOString(),
     buffer: '',
     browserUrl: url,
+    isBackground: false,
   });
   setStore('activeId', id);
 }
@@ -170,9 +209,18 @@ export function terminateSession(id: string, exitCode: number | null = null) {
 }
 
 /**
+ * Utility to strip ANSI escape codes from a string for safe display in non-terminal UIs.
+ */
+export function stripAnsi(text: string): string {
+  // Common ANSI escape sequence regex
+  return text.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+}
+
+/**
  * Appends output data to a session's buffer.
  */
 export function appendOutput(id: string, data: string) {
+  console.log(`[sessionStore] Appending ${data.length} bytes to session ${id}`);
   setStore('sessions', id, 'buffer', (prev) => {
     const combined = prev + data;
     if (combined.length > MAX_BUFFER_SIZE) {
@@ -194,6 +242,10 @@ export function setActiveSession(id: string | null) {
  */
 export function renameSession(id: string, name: string) {
   setStore('sessions', id, 'customName', name);
+}
+
+export function renameExternalService(pid: number, name: string) {
+  setStore('externalNames', pid, name);
 }
 
 /**

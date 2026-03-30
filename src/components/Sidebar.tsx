@@ -1,9 +1,12 @@
+import { sessionStore, toggleServerManager, toggleExplorer } from "../store/sessionStore";
+
 interface SidebarProps {
   onLaunch: () => void;
   onOpenSettings: () => void;
 }
 
 const HexagonLogo = () => (
+// ... (rest of HexagonLogo)
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M12 2L20.6603 7V17L12 22L3.33975 17V7L12 2Z" stroke="var(--accent-primary)" stroke-width="1.5"/>
     <path d="M12 2V22" stroke="var(--border-main)" stroke-width="1"/>
@@ -55,17 +58,19 @@ export const Sidebar = (props: SidebarProps) => {
 
         <button
           title="Explorer"
+          onClick={toggleExplorer}
           style={{
             width: "36px",
             height: "36px",
-            background: "transparent",
+            background: sessionStore.isExplorerOpen ? "rgba(88, 166, 255, 0.1)" : "transparent",
             border: "none",
             cursor: "pointer",
             display: "flex",
             "align-items": "center",
             "justify-content": "center",
             transition: "all 0.2s ease",
-            color: "var(--text-muted)"
+            color: sessionStore.isExplorerOpen ? "var(--accent-primary)" : "var(--text-muted)",
+            "border-radius": "4px"
           }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -91,6 +96,28 @@ export const Sidebar = (props: SidebarProps) => {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </button>
+
+        <button
+          title="Server Manager"
+          onClick={toggleServerManager}
+          style={{
+            width: "36px",
+            height: "36px",
+            background: sessionStore.isServerManagerOpen ? "rgba(0, 229, 255, 0.1)" : "transparent",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            "align-items": "center",
+            "justify-content": "center",
+            transition: "all 0.2s ease",
+            color: sessionStore.isServerManagerOpen ? "var(--accent-primary)" : "var(--text-muted)",
+            "border-radius": "4px"
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
           </svg>
         </button>
       </div>

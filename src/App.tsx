@@ -6,9 +6,11 @@ import { sessionStore, setActiveWorkspace, removeWorkspace, updateWorkspaceColor
 import { Sidebar } from "./components/Sidebar";
 import { RightSidebar } from "./components/RightSidebar";
 import { SourceControlPanel } from "./components/SourceControlPanel";
+import { FileExplorerPanel } from "./components/FileExplorerPanel";
 import { Workspace } from "./components/Workspace";
 import { LauncherModal } from "./components/LauncherModal";
 import { SettingsPage } from "./components/SettingsPage";
+import ServerManager from "./components/ServerManager";
 import "./App.css";
 
 function App() {
@@ -228,6 +230,7 @@ function App() {
 
         {/* BOTTOM CONTENT AREA */}
         <div class="content-body">
+          <FileExplorerPanel />
           <main class="main-content">
             <section class="workspace-container" style={{ position: "relative", flex: 1 }}>
               <For each={sessionStore.workspaces}>
@@ -282,6 +285,9 @@ function App() {
         </div>
       </div>
 
+      <Show when={sessionStore.isServerManagerOpen}>
+        <ServerManager />
+      </Show>
       <Show when={isLauncherOpen()}>
         <LauncherModal isOpen={true} onClose={() => setIsLauncherOpen(false)} />
       </Show>
