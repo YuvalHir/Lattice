@@ -7,6 +7,12 @@ use sysinfo::{Pid, ProcessesToUpdate, System};
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::{mpsc, Mutex};
 
+#[tauri::command]
+pub async fn check_directory_exists(path: String) -> bool {
+    let p = std::path::Path::new(&path);
+    p.exists() && p.is_dir()
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MemoryUsage {
     pub workspace_bytes: u64,
@@ -107,17 +113,17 @@ pub async fn spawn_process(
     let mut master_writer = pair.master.take_writer().map_err(|e| e.to_string())?;
 
     let (stdin_tx, mut stdin_rx) = mpsc::channel::<Vec<u8>>(100);
+    
+    // TTY-Spoofing channel: Internal channel to send responses back to the process
+    let (spoof_tx, mut spoof_rx) = mpsc::channel::<Vec<u8>>(10);
 
     // Reader thread
     let app_reader = app.clone();
     let session_id_reader = session_id.clone();
+    let spoof_tx_clone = spoof_tx.clone();
+    
     std::thread::spawn(move || {
         let mut buffer = [0u8; 4096];
-        // println!(
-        //     "[PTY] Reader loop started for session {}",
-        //     session_id_reader
-        // );
-
         loop {
             match master_reader.read(&mut buffer) {
                 Ok(n) if n > 0 => {
@@ -126,6 +132,13 @@ pub async fn spawn_process(
 
                     if !cleaned_bytes.is_empty() {
                         let data_str = String::from_utf8_lossy(&cleaned_bytes).into_owned();
+                        
+                        // TTY-Spoof: If we see a cursor position request (\x1b[6n), queue a response.
+                        if data_str.contains("\x1b[6n") {
+                            let _ = spoof_tx_clone.try_send(b"\x1b[1;1R".to_vec());
+                        }
+
+                        // println!("[PTY] Emitting {} bytes for session {}: {:?}", cleaned_bytes.len(), session_id_reader, data_str);
                         let _ = app_reader.emit(
                             "terminal-output",
                             TerminalOutputPayload {
@@ -135,23 +148,25 @@ pub async fn spawn_process(
                         );
                     }
                 }
-                Ok(_) => {
-                    break;
-                }
-                Err(_e) => {
-                    break;
-                }
+                Ok(_) | Err(_) => break,
             }
         }
     });
 
-    // Writer task
+    // Unified Writer task
     tokio::spawn(async move {
-        while let Some(data) = stdin_rx.recv().await {
-            if let Err(_e) = master_writer.write_all(&data) {
-                break;
+        loop {
+            tokio::select! {
+                Some(data) = stdin_rx.recv() => {
+                    if master_writer.write_all(&data).is_err() { break; }
+                    let _ = master_writer.flush();
+                }
+                Some(data) = spoof_rx.recv() => {
+                    if master_writer.write_all(&data).is_err() { break; }
+                    let _ = master_writer.flush();
+                }
+                else => break,
             }
-            let _ = master_writer.flush();
         }
     });
 
@@ -300,6 +315,239 @@ pub async fn kill_process(
     let mut registry = state.lock().await;
     registry.sessions.remove(&id);
     Ok(())
+}
+
+#[tauri::command]
+pub async fn kill_pid(pid: u32) -> Result<(), String> {
+    println!("[BACKEND] kill_pid pid={}", pid);
+
+    #[cfg(windows)]
+    {
+        let mut kill = std::process::Command::new("taskkill")
+            .arg("/F")
+            .arg("/T")
+            .arg("/PID")
+            .arg(pid.to_string())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let _ = kill.wait();
+    }
+    #[cfg(not(windows))]
+    {
+        let mut kill = std::process::Command::new("kill")
+            .arg("-9")
+            .arg(pid.to_string())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let _ = kill.wait();
+    }
+    Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ServiceInfo {
+    pub name: String,
+    pub pid: u32,
+    pub ports: Vec<u16>,
+    pub cwd: String,
+    pub executable: String,
+    pub is_managed: bool,
+    pub session_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PortOwner {
+    #[serde(rename = "LocalPort")]
+    local_port: u16,
+    #[serde(rename = "OwningProcess")]
+    owning_process: u32,
+}
+
+#[tauri::command]
+pub async fn get_all_services(
+    state: State<'_, Arc<Mutex<SessionRegistry>>>,
+) -> Result<Vec<ServiceInfo>, String> {
+    let mut sys = System::new_all();
+    sys.refresh_all();
+
+    let mut port_map: std::collections::HashMap<u32, Vec<u16>> = std::collections::HashMap::new();
+
+    // 1. Get Listening Ports
+    #[cfg(windows)]
+    {
+        let output = tokio::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                "Get-NetTCPConnection -State Listen | Select-Object LocalPort, OwningProcess | ConvertTo-Json",
+            ])
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if !stdout.trim().is_empty() {
+                if let Ok(owners) = serde_json::from_str::<Vec<PortOwner>>(&stdout) {
+                    for owner in owners {
+                        port_map
+                            .entry(owner.owning_process)
+                            .or_default()
+                            .push(owner.local_port);
+                    }
+                } else if let Ok(owner) = serde_json::from_str::<PortOwner>(&stdout) {
+                    port_map
+                        .entry(owner.owning_process)
+                        .or_default()
+                        .push(owner.local_port);
+                }
+            }
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        let output = tokio::process::Command::new("ss")
+            .args(["-tunlp"])
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines().skip(1) {
+                if let Some(pid_start) = line.find("pid=") {
+                    let pid_str: String = line[pid_start + 4..]
+                        .chars()
+                        .take_while(|c| c.is_ascii_digit())
+                        .collect();
+                    if let Ok(pid) = pid_str.parse::<u32>() {
+                        if let Some(addr_start) = line.rfind(" ") {
+                            let part = &line[..addr_start].trim();
+                            if let Some(last_space) = part.rfind(" ") {
+                                let addr = &part[last_space + 1..];
+                                if let Some(port_start) = addr.rfind(":") {
+                                    if let Ok(port) = addr[port_start + 1..].parse::<u16>() {
+                                        port_map.entry(pid).or_default().push(port);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let registry = state.lock().await;
+    let mut services = Vec::new();
+    let mut seen_pids = std::collections::HashSet::new();
+
+    // 2. First, add all MANAGED sessions from the registry
+    for (id, handle) in &registry.sessions {
+        if handle.status == SessionStatus::Terminated {
+            continue;
+        }
+
+        let root_pid = handle.pid;
+        seen_pids.insert(root_pid);
+
+        // Find ALL descendants of this managed process to prevent duplicate "External" entries
+        let mut tree_pids = vec![root_pid];
+        let mut ports = port_map.get(&root_pid).cloned().unwrap_or_default();
+
+        // One pass over all processes to find children and their ports
+        for (&proc_pid, _) in sys.processes() {
+            if is_descendant(&sys, proc_pid, Pid::from_u32(root_pid)) {
+                let proc_pid_u32 = proc_pid.to_string().parse::<u32>().unwrap_or(0);
+                tree_pids.push(proc_pid_u32);
+                seen_pids.insert(proc_pid_u32);
+                if let Some(p) = port_map.get(&proc_pid_u32) {
+                    ports.extend(p);
+                }
+            }
+        }
+        
+        // Filter out ephemeral ports (>32768) if we have other ports, 
+        // as they are usually internal IPC/debug ports.
+        let mut significant_ports: Vec<u16> = ports.iter().cloned().filter(|&p| p < 32768).collect();
+        if significant_ports.is_empty() {
+            significant_ports = ports;
+        }
+        
+        significant_ports.sort();
+        significant_ports.dedup();
+
+        if let Some(proc) = sys.process(Pid::from_u32(root_pid)) {
+            // If the root is a shell but has a Node child, maybe use the child's name?
+            // For now, stick to the managed ID/Name.
+            services.push(ServiceInfo {
+                name: proc.name().to_string_lossy().to_string(),
+                pid: root_pid,
+                ports: significant_ports,
+                cwd: proc.cwd().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
+                executable: proc.exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
+                is_managed: true,
+                session_id: Some(id.clone()),
+            });
+        }
+    }
+
+    // 3. Add EXTERNAL Node services that are listening on ports
+    for (pid, ports) in port_map {
+        if seen_pids.contains(&pid) {
+            continue;
+        }
+
+        let sys_pid = Pid::from_u32(pid);
+        if let Some(proc) = sys.process(sys_pid) {
+            let exe_path = proc.exe().map(|p| p.to_string_lossy().to_lowercase()).unwrap_or_default();
+            let proc_name = proc.name().to_string_lossy().to_lowercase();
+            
+            let is_node = proc_name.contains("node") || 
+                          proc_name.contains("npm") || 
+                          proc_name.contains("yarn") || 
+                          proc_name.contains("pnpm") ||
+                          exe_path.contains("node") ||
+                          exe_path.contains("nvm");
+
+            if is_node {
+                let mut significant_ports: Vec<u16> = ports.iter().cloned().filter(|&p| p < 49152).collect();
+                if significant_ports.is_empty() {
+                    significant_ports = ports;
+                }
+                significant_ports.sort();
+                significant_ports.dedup();
+
+                services.push(ServiceInfo {
+                    name: proc.name().to_string_lossy().to_string(),
+                    pid,
+                    ports: significant_ports,
+                    cwd: proc.cwd().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
+                    executable: proc.exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
+                    is_managed: false,
+                    session_id: None,
+                });
+            }
+        }
+    }
+
+    Ok(services)
+}
+
+fn is_descendant(sys: &System, pid: Pid, root: Pid) -> bool {
+    let mut current = pid;
+    while let Some(proc) = sys.process(current) {
+        if let Some(parent) = proc.parent() {
+            if parent == root {
+                return true;
+            }
+            current = parent;
+        } else {
+            break;
+        }
+    }
+    false
 }
 
 #[tauri::command]

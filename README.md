@@ -4,6 +4,7 @@ Lattice is a desktop workspace for running multiple AI coding agents in parallel
 
 ## Features
 
+- **Workspace File Explorer**: Built-in file navigation with high-fidelity branded icons for common languages and frameworks (Rust, Python, TypeScript, JavaScript, Docker, etc.). Supports recursive directory expansion and workspace-specific browsing.
 - **Git Source Control Integration**: First-class support for Git repositories. Stage changes, commit with custom messages, and view project history directly within the workspace.
 - **Hybrid IDE Layout**: A professional, multiplexed interface with a full-height primary sidebar, a persistent global title bar with workspace tabs, and a utility-focused right sidebar.
 - **The Swarm Builder**: A premium, multi-step onboarding experience for creating your workspace with a live grid preview.

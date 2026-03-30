@@ -61,31 +61,30 @@ pub fn spawn_with_pty(
     })?;
 
     // 1. Resolve the shell and wrapping arguments based on context
-    let (shell_exe, mut shell_args) = match context {
+    let (shell_exe, shell_args) = match context {
         ExecutionContext::Native => {
             #[cfg(windows)]
             {
-                ("powershell.exe".to_string(), vec!["-NoLogo".to_string(), "-Command".to_string()])
+                (
+                    "powershell.exe".to_string(),
+                    vec!["-NoLogo".to_string(), "-NoProfile".to_string()],
+                )
             }
             #[cfg(not(windows))]
             {
                 let shell = env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
-                // Use login shell mode so user PATH customizations are loaded.
                 (shell, vec!["-lc".to_string()])
             }
         }
-        ExecutionContext::PowerShell => {
-            ("powershell.exe".to_string(), vec!["-NoLogo".to_string(), "-Command".to_string()])
-        }
-        ExecutionContext::CMD => {
-            ("cmd.exe".to_string(), vec!["/C".to_string()])
-        }
-        ExecutionContext::WSL => {
-            (
-                "wsl.exe".to_string(),
-                vec!["--".to_string(), "bash".to_string(), "-ilc".to_string()],
-            )
-        }
+        ExecutionContext::PowerShell => (
+            "powershell.exe".to_string(),
+            vec!["-NoLogo".to_string(), "-NoProfile".to_string()],
+        ),
+        ExecutionContext::CMD => ("cmd.exe".to_string(), vec!["/C".to_string()]),
+        ExecutionContext::WSL => (
+            "wsl.exe".to_string(),
+            vec!["--".to_string(), "bash".to_string(), "-ilc".to_string()],
+        ),
     };
 
     // 2. Resolve the absolute path for the shell executable (Windows only)
@@ -111,18 +110,23 @@ pub fn spawn_with_pty(
     // 4. Initialize CommandBuilder with the shell
     let mut builder = CommandBuilder::new(&resolved_shell);
 
+    // Set common environment variables to prevent TTY hangs and enable colors
+    builder.env("TERM", "xterm-256color");
+    builder.env("COLORTERM", "truecolor");
+    builder.env("CI", "true");
+    builder.env("FORCE_COLOR", "1");
+    builder.env("NP_NO_UPDATE_NOTIFIER", "1"); // Silence npm update checks
+
     // 5. Wrap the command
     if !cmd.is_empty() {
         // Apply shell arguments (like -- or -Command)
-        for arg in shell_args {
+        for arg in &shell_args {
             builder.arg(arg);
         }
 
-        // PowerShell/CMD special wrapping: use a single command string
-        if context == &ExecutionContext::PowerShell || 
-           (context == &ExecutionContext::Native && cfg!(windows)) ||
-           context == &ExecutionContext::CMD {
-            
+        if context == &ExecutionContext::WSL {
+            builder.arg(build_wsl_command(cmd, args));
+        } else {
             let mut full_cmd = cmd.to_string();
             if !args.is_empty() {
                 for arg in args {
@@ -131,25 +135,19 @@ pub fn spawn_with_pty(
                 }
             }
 
-            if context == &ExecutionContext::CMD {
+            #[cfg(windows)]
+            {
+                if context == &ExecutionContext::CMD {
+                    builder.arg(full_cmd);
+                } else {
+                    builder.arg("-Command");
+                    builder.arg(full_cmd);
+                }
+            }
+            #[cfg(not(windows))]
+            {
                 builder.arg(full_cmd);
-            } else {
-                builder.arg(format!("& {}", full_cmd));
             }
-        } else if context == &ExecutionContext::WSL {
-            // WSL launches through bash -lc so PATH/profile customizations are loaded.
-            builder.arg(build_wsl_command(cmd, args));
-        } else {
-            // Native Unix: pass argv directly.
-            builder.arg(cmd);
-            for arg in args {
-                builder.arg(arg);
-            }
-        }
-    } else {
-        // Just launch the interactive shell if no command provided
-        for arg in args {
-            builder.arg(arg);
         }
     }
 

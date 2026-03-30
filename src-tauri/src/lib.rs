@@ -23,6 +23,7 @@ pub fn run() {
             commands::spawn_process,
             commands::write_to_stdin,
             commands::kill_process,
+            commands::kill_pid,
             commands::resize_terminal,
             commands::get_git_info,
             commands::git_status,
@@ -34,6 +35,8 @@ pub fn run() {
             commands::git_add_all,
             commands::get_git_log,
             commands::get_memory_usage,
+            commands::get_all_services,
+            commands::check_directory_exists,
         ])
 
 

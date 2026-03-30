@@ -52,8 +52,11 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__ # This will be replaced by the version from tauri.conf.json
+          tagName: v__VERSION__
           releaseName: "Lattice v__VERSION__"
           releaseBody: ${{steps.build_changelog.outputs.changelog}}
           releaseDraft: true
           prerelease: false
+          includeRelease: true
+          includeAuthenticate: true
+

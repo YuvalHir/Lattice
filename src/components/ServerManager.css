@@ -1,0 +1,508 @@
+.server-manager-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  backdrop-filter: blur(8px);
+}
+
+.server-manager-content {
+  width: 90%;
+  height: 85%;
+  background: #0C0C0C;
+  border: 1px solid #333;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 1);
+  overflow: hidden;
+}
+
+.server-manager-header {
+  padding: 1.5rem 2.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #222;
+  background: #111;
+}
+
+.header-title h2 {
+  margin: 0;
+  font-size: 1.6rem;
+  color: #00E5FF;
+  letter-spacing: 0.5px;
+}
+
+.service-count {
+  font-size: 0.8rem;
+  color: #666;
+  font-family: 'Cascadia Code', monospace;
+}
+
+.header-actions {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.launch-btn {
+  background: #238636;
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.launch-btn:hover {
+  background: #2ea043;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: #666;
+  font-size: 1.8rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  color: #fff;
+}
+
+.services-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #ccc;
+  font-family: 'Cascadia Code', monospace;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  background: #111;
+  text-align: left;
+  padding: 1.2rem 1.5rem;
+  border-bottom: 2px solid #222;
+  color: #555;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 1.5px;
+  z-index: 10;
+}
+
+tbody tr {
+  border-bottom: 1px solid #1a1a1a;
+  transition: background 0.1s;
+}
+
+tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+tbody td {
+  padding: 1.2rem 1.5rem;
+  vertical-align: middle;
+}
+
+.service-name {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.name-text {
+  font-weight: 600;
+  color: #eee;
+  font-size: 0.95rem;
+}
+
+.name-display-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.name-display-wrapper:hover .name-text {
+  text-decoration: underline;
+  color: #00E5FF;
+}
+
+.edit-icon {
+  opacity: 0;
+  color: #666;
+  transition: opacity 0.2s;
+}
+
+.name-display-wrapper:hover .edit-icon {
+  opacity: 1;
+}
+
+.rename-input {
+  background: #000;
+  border: 1px solid #00E5FF;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Cascadia Code', monospace;
+  font-size: 0.9rem;
+  width: 180px;
+}
+
+.indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #222;
+}
+
+.indicator.active {
+  background: #50FA7B;
+  box-shadow: 0 0 10px rgba(80, 250, 123, 0.4);
+}
+
+.tag {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.tag.external {
+  background: #222;
+  color: #666;
+  border: 1px solid #333;
+}
+
+.tag.managed {
+  background: rgba(0, 229, 255, 0.1);
+  color: #00E5FF;
+  border: 1px solid rgba(0, 229, 255, 0.2);
+}
+
+.port-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.port-link {
+  color: #00E5FF;
+  text-decoration: none;
+  background: rgba(0, 229, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  border: 1px solid rgba(0, 229, 255, 0.2);
+}
+
+.port-link:hover {
+  background: rgba(0, 229, 255, 0.2);
+  border-color: #00E5FF;
+}
+
+.no-ports {
+  color: #444;
+  font-size: 0.8rem;
+}
+
+.pid-code {
+  color: #BD93F9;
+  background: rgba(189, 147, 249, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.status-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #555;
+}
+
+.status-badge.listening {
+  color: #50FA7B;
+}
+
+.path-cell {
+  max-width: 300px;
+}
+
+.path-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #555;
+  font-size: 0.8rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.action-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: #666;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn:hover {
+  color: #fff;
+  border-color: #555;
+  background: #222;
+}
+
+.action-btn.stop:hover {
+  background: rgba(255, 85, 85, 0.15);
+  color: #FF5555;
+  border-color: #FF5555;
+}
+
+.action-btn.restart:hover {
+  background: rgba(80, 250, 123, 0.1);
+  color: #50FA7B;
+  border-color: #50FA7B;
+}
+
+/* Modal Styling */
+.launch-modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  backdrop-filter: blur(4px);
+}
+
+.launch-modal-content {
+  background: #111;
+  width: 450px;
+  padding: 2rem;
+  border-radius: 12px;
+  border: 1px solid #333;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+}
+
+.launch-modal-content h3 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  color: #fff;
+}
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.75rem;
+  color: #666;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+  letter-spacing: 1px;
+}
+
+.form-group input {
+  width: 100%;
+  background: #000;
+  border: 1px solid #222;
+  color: #fff;
+  padding: 0.75rem;
+  border-radius: 6px;
+  font-family: 'Cascadia Code', monospace;
+  font-size: 0.9rem;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #00E5FF;
+}
+
+.dir-input {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dir-input button {
+  background: #222;
+  color: #ccc;
+  border: 1px solid #333;
+  padding: 0 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.modal-footer {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.btn-cancel {
+  background: transparent;
+  color: #666;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+}
+
+.btn-deploy {
+  background: #00E5FF;
+  color: #000;
+  border: none;
+  padding: 0.6rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-deploy:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.shell-input-wrapper {
+  display: flex;
+  align-items: center;
+  background: #000;
+  border: 1px solid #222;
+  border-radius: 6px;
+  padding: 0 0.75rem;
+}
+
+.shell-prompt {
+  color: #50FA7B;
+  font-family: 'Cascadia Code', monospace;
+  margin-right: 0.5rem;
+  font-weight: bold;
+}
+
+.shell-input-wrapper input {
+  border: none !important;
+  padding: 0.75rem 0 !important;
+}
+
+.hint {
+  display: block;
+  font-size: 0.65rem;
+  color: #444;
+  margin-top: 0.4rem;
+  font-family: 'Cascadia Code', monospace;
+}
+
+.hint.error-text {
+  color: #FF5555;
+}
+
+.shell-input-wrapper.error-shake {
+  border-color: #FF5555 !important;
+  animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+/* Log Viewer Styles */
+.log-viewer-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 150;
+  backdrop-filter: blur(10px);
+}
+
+.log-viewer-content {
+  background: #000;
+  width: 90%;
+  height: 80%;
+  border: 1px solid #333;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 30px 100px rgba(0,0,0,1);
+}
+
+.log-viewer-header {
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #111;
+  border-bottom: 1px solid #222;
+}
+
+.log-viewer-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #50FA7B;
+  font-family: 'Cascadia Code', monospace;
+}
+
+.log-display {
+  flex: 1;
+  padding: 1.5rem;
+  margin: 0;
+  overflow-y: auto;
+  color: #eee;
+  font-family: 'Cascadia Code', monospace;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #050505;
+}
+
+.action-btn.logs:hover {
+  background: rgba(0, 229, 255, 0.1);
+  color: #00E5FF;
+  border-color: #00E5FF;
+}
