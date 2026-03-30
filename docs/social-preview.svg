@@ -1,0 +1,35 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1280" height="640" fill="#0d1117"/>
+  
+  <!-- Subtle Gradient Glow -->
+  <circle cx="640" cy="320" r="400" fill="url(#paint0_radial)" fill-opacity="0.15"/>
+
+  <!-- Logo and Text Container -->
+  <g transform="translate(340, 220)">
+    <!-- Hexagon Logo (Scaled up) -->
+    <g transform="scale(8.5)">
+      <path d="M12 2L20.6603 7V17L12 22L3.33975 17V7L12 2Z" stroke="#58a6ff" stroke-width="1.5"/>
+      <path d="M12 2V22" stroke="#30363d" stroke-width="1"/>
+      <path d="M3.33975 7L20.6603 17" stroke="#30363d" stroke-width="1"/>
+      <path d="M3.33975 17L20.6603 7" stroke="#30363d" stroke-width="1"/>
+    </g>
+
+    <!-- App Name -->
+    <text x="240" y="145" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="140" font-weight="700" letter-spacing="-0.02em">Lattice</text>
+    
+    <!-- Subtitle -->
+    <text x="245" y="195" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="28" font-weight="400" letter-spacing="0.05em">MULTIPLEXED ORCHESTRATION ENVIRONMENT</text>
+  </g>
+
+  <!-- Decorative Border Accents -->
+  <rect x="1" y="1" width="1278" height="638" rx="4" stroke="#30363d" stroke-width="2"/>
+  <path d="M0 0H1280V120L1200 0H0Z" fill="#58a6ff" fill-opacity="0.03"/>
+
+  <defs>
+    <radialGradient id="paint0_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" transform="translate(640 320) rotate(90) scale(400)">
+      <stop stop-color="#58a6ff"/>
+      <stop offset="1" stop-color="#58a6ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>
