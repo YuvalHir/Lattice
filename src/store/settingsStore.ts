@@ -1,6 +1,6 @@
 import { createStore } from "solid-js/store";
 
-export const SESSION_TYPES = ["Gemini", "Claude", "Codex", "OpenCode", "WSL", "Browser"] as const;
+export const SESSION_TYPES = ["Gemini", "Claude", "Codex", "OpenCode", "WSL", "Browser", "Terminal"] as const;
 export type SessionType = typeof SESSION_TYPES[number];
 
 export const LAST_WORKING_DIR_KEY = "lattice:lastWorkingDirectory";
@@ -28,6 +28,7 @@ export const defaultSettings: AppSettings = {
     OpenCode: 0,
     WSL: 0,
     Browser: 0,
+    Terminal: 0,
   },
 };
 
@@ -69,6 +70,7 @@ function sanitizeSettings(raw: unknown): AppSettings {
       OpenCode: Math.max(0, Number(sessionCounts.OpenCode ?? defaultSettings.defaultSessionCounts.OpenCode)),
       WSL: Math.max(0, Number(sessionCounts.WSL ?? defaultSettings.defaultSessionCounts.WSL)),
       Browser: Math.max(0, Number(sessionCounts.Browser ?? defaultSettings.defaultSessionCounts.Browser)),
+      Terminal: Math.max(0, Number(sessionCounts.Terminal ?? defaultSettings.defaultSessionCounts.Terminal)),
     },
   };
 }

@@ -192,6 +192,7 @@ export const SettingsPage = (props: SettingsPageProps) => {
                     {type === "OpenCode" && "□"}
                     {type === "WSL" && "▤"}
                     {type === "Browser" && "🌐"}
+                    {type === "Terminal" && "⧉"}
                   </span>
                   <span class="settings-session-name">{type}</span>
                 </div>

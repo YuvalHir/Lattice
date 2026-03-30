@@ -81,6 +81,16 @@ export const PRESETS: Record<string, LauncherPreset> = {
     runtime: 'native',
     context: 'Native',
   },
+  Terminal: {
+    id: 'terminal',
+    name: 'Terminal',
+    command: {
+      executable: '',
+      args: [],
+    },
+    runtime: 'native',
+    context: 'PowerShell',
+  },
 };
 
 export type WorkspaceLaunchItem = keyof typeof PRESETS | 'Browser';

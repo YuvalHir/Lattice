@@ -60,6 +60,12 @@ const AGENT_ICONS: Record<SessionType, JSX.Element> = {
       <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
     </svg>
   ),
+  Terminal: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="4 17 10 11 4 5" />
+      <line x1="12" y1="19" x2="20" y2="19" />
+    </svg>
+  ),
 };
 
 export const LauncherModal = (props: LauncherModalProps) => {
@@ -71,7 +77,7 @@ export const LauncherModal = (props: LauncherModalProps) => {
   const [sessionCounts, setSessionCounts] = createSignal<SessionCounts>({ ...settingsStore.defaultSessionCounts });
   
   const [preLaunched, setPreLaunched] = createSignal<Record<SessionType, string[]>>({
-    Gemini: [], Claude: [], Codex: [], OpenCode: [], WSL: [], Browser: []
+    Gemini: [], Claude: [], Codex: [], OpenCode: [], WSL: [], Browser: [], Terminal: []
   });
 
   const [shellOverrides, setShellOverrides] = createSignal<Record<SessionType, ExecutionContext>>({
@@ -80,17 +86,18 @@ export const LauncherModal = (props: LauncherModalProps) => {
     Codex: "Native", 
     OpenCode: "Native", 
     WSL: "WSL", 
-    Browser: "Native"
+    Browser: "Native",
+    Terminal: "PowerShell"
   });
   
   const [showAdvanced, setShowAdvanced] = createSignal(false);
   
   // Track how many are currently in the process of spawning to prevent duplicates
   const [spawningCounts, setSpawningCounts] = createSignal<Record<SessionType, number>>({
-    Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0
+    Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0, Terminal: 0
   });
   const [retryAfterTs, setRetryAfterTs] = createSignal<Record<SessionType, number>>({
-    Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0
+    Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0, Terminal: 0
   });
 
   // Track the directory for which we've pre-launched agents
@@ -260,11 +267,12 @@ export const LauncherModal = (props: LauncherModalProps) => {
     setSessionCounts(prev => ({ ...prev, [type]: Math.max(0, prev[type] + delta) }));
   };
 
-  const applyPreset = (preset: "pair" | "quad" | "browser-heavy") => {
-    const counts: SessionCounts = { Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0 };
+  const applyPreset = (preset: "pair" | "quad" | "browser-heavy" | "wsl-swarm") => {
+    const counts: SessionCounts = { Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0, Terminal: 1 };
     if (preset === "pair") { counts.Gemini = 1; counts.Claude = 1; }
     if (preset === "quad") { counts.Gemini = 2; counts.Claude = 2; }
     if (preset === "browser-heavy") { counts.Browser = 1; counts.Gemini = 2; counts.Claude = 1; }
+    if (preset === "wsl-swarm") { counts.WSL = 4; }
     setSessionCounts(counts);
   };
 
@@ -353,10 +361,11 @@ export const LauncherModal = (props: LauncherModalProps) => {
                 </div>
 
                 <div style={{ display: "flex", gap: "8px", "margin-bottom": "0.5rem" }}>
-                  <span class="launcher-label">Quick Presets:</span>
-                  <div class="preset-chip" onClick={() => applyPreset("pair")}>The Pair (1+1)</div>
-                  <div class="preset-chip" onClick={() => applyPreset("quad")}>The Quad (2+2)</div>
-                  <div class="preset-chip" onClick={() => applyPreset("browser-heavy")}>Web Dev</div>
+                  <span class="launcher-label">Presets:</span>
+                  <div class="preset-chip" onClick={() => applyPreset("pair")}>Pair (1+1)</div>
+                  <div class="preset-chip" onClick={() => applyPreset("quad")}>Quad (2+2)</div>
+                  <div class="preset-chip" onClick={() => applyPreset("browser-heavy")}>Web</div>
+                  <div class="preset-chip" onClick={() => applyPreset("wsl-swarm")}>WSL + Terminal</div>
                 </div>
 
                 <div class="agent-selector-palette">
