@@ -5,6 +5,11 @@ Lattice is a desktop workspace for running multiple AI coding agents in parallel
 ## Features
 
 - **Workspace File Explorer**: Built-in file navigation with high-fidelity branded icons for common languages and frameworks (Rust, Python, TypeScript, JavaScript, Docker, etc.). Supports recursive directory expansion and workspace-specific browsing.
+- **Server Management Dashboard**: Centralized hub for monitoring active Node.js services. Features include:
+    - **System-Wide Discovery**: Automatically detects background services and maps them to their active ports.
+    - **Clean Logs**: In-app log viewer with ANSI-code stripping for readable process output.
+    - **Process Lifecycle**: Stop, restart, and rename services (both managed by Lattice and external).
+    - **Background Deployment**: Launch new background services with a "Quick CD" navigation interface and default home directory scoping.
 - **Git Source Control Integration**: First-class support for Git repositories. Stage changes, commit with custom messages, and view project history directly within the workspace.
 - **Hybrid IDE Layout**: A professional, multiplexed interface with a full-height primary sidebar, a persistent global title bar with workspace tabs, and a utility-focused right sidebar.
 - **The Swarm Builder**: A premium, multi-step onboarding experience for creating your workspace with a live grid preview.
