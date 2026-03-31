@@ -3,42 +3,68 @@ import { appendOutput, terminateSession, sessionStore } from './store/sessionSto
 import { terminalRegistry } from './components/TerminalWrapper';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
+import { ask, message } from '@tauri-apps/plugin-dialog';
 
 /**
- * Checks for application updates.
+ * Checks for application updates and prompts the user to install them.
+ * @param manual If true, shows a message even if no update is found.
  */
-async function checkForUpdates() {
+export async function checkForUpdates(manual = false) {
+  console.log(`[Updater] Checking for updates (manual: ${manual})...`);
   try {
     const update = await check();
     if (update) {
-      console.log(`Update available: ${update.version} from ${update.date}`);
-      let downloaded = 0;
-      let contentLength: number | undefined = 0;
-
-      // You can implement a custom UI for progress here if needed.
-      // For now, we'll use the built-in system dialogs if enabled, 
-      // but manually trigger download/install to be safe.
-      await update.downloadAndInstall((event) => {
-        switch (event.event) {
-          case 'Started':
-            contentLength = event.data.contentLength;
-            console.log(`Started downloading ${event.data.contentLength} bytes`);
-            break;
-          case 'Progress':
-            downloaded += event.data.chunkLength;
-            // console.log(`Downloaded ${downloaded} from ${contentLength}`);
-            break;
-          case 'Finished':
-            console.log('Download finished');
-            break;
+      console.log(`[Updater] Update available: ${update.version} from ${update.date}`);
+      
+      const shouldUpdate = await ask(
+        `A new version (${update.version}) is available. Would you like to install it now?\n\nRelease notes: ${update.body || 'No release notes provided.'}`,
+        {
+          title: 'Update Available',
+          kind: 'info',
+          okLabel: 'Update and Relaunch',
+          cancelLabel: 'Later'
         }
-      });
+      );
 
-      console.log('Update installed, restarting...');
-      await relaunch();
+      if (shouldUpdate) {
+        console.log('[Updater] User accepted update. Downloading...');
+        
+        await update.downloadAndInstall((event) => {
+          switch (event.event) {
+            case 'Started':
+              console.log(`[Updater] Started downloading ${event.data.contentLength} bytes`);
+              break;
+            case 'Progress':
+              // console.log(`[Updater] Downloaded ${event.data.chunkLength} bytes`);
+              break;
+            case 'Finished':
+              console.log('[Updater] Download finished');
+              break;
+          }
+        });
+
+        console.log('[Updater] Update installed, restarting...');
+        await relaunch();
+      } else {
+        console.log('[Updater] User deferred update.');
+      }
+    } else {
+      console.log('[Updater] No updates found.');
+      if (manual) {
+        await message('You are already running the latest version.', {
+          title: 'No Update Available',
+          kind: 'info'
+        });
+      }
     }
   } catch (error) {
-    console.error('Failed to check for updates:', error);
+    console.error('[Updater] Failed to check for updates:', error);
+    if (manual) {
+      await message(`Failed to check for updates: ${error}`, {
+        title: 'Update Check Failed',
+        kind: 'error'
+      });
+    }
   }
 }
 

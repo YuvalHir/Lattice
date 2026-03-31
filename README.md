@@ -1,78 +1,103 @@
-# Lattice
+# <img src="src/assets/logo.svg" width="48" height="48" valign="middle"> Lattice
 
-Lattice is a desktop workspace for running multiple AI coding agents in parallel, built with Tauri v2, SolidJS, and Rust. It lets you launch mixed session layouts (Gemini, Claude, Codex, OpenCode, WSL, and Browser) into a single grid.
+[![Version](https://img.shields.io/badge/version-0.1.2-blue.svg)](https://github.com/YuvalHir/Lattice/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Tauri](https://img.shields.io/badge/Tauri-v2-FFC131?logo=tauri&logoColor=white)](https://tauri.app/)
+[![Rust](https://img.shields.io/badge/Rust-1.75+-black?logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![SolidJS](https://img.shields.io/badge/SolidJS-v1.9-2c4f7c?logo=solid&logoColor=white)](https://www.solidjs.com/)
 
-## Features
+**Lattice** is a high-performance, zero-latency multiplexed orchestration environment designed for parallel AI agent swarms. Built with a Rust-powered backend and a reactive SolidJS frontend, it provides a "Zero-Scroll" workspace where terminals are perfectly tiled and synchronized.
 
-- **Workspace File Explorer**: Built-in file navigation with high-fidelity branded icons for common languages and frameworks (Rust, Python, TypeScript, JavaScript, Docker, etc.). Supports recursive directory expansion and workspace-specific browsing.
-- **Server Management Dashboard**: Centralized hub for monitoring active Node.js services. Features include:
-    - **System-Wide Discovery**: Automatically detects background services and maps them to their active ports.
-    - **Clean Logs**: In-app log viewer with ANSI-code stripping for readable process output.
-    - **Process Lifecycle**: Stop, restart, and rename services (both managed by Lattice and external).
-    - **Background Deployment**: Launch new background services with a "Quick CD" navigation interface and default home directory scoping.
-- **Git Source Control Integration**: First-class support for Git repositories. Stage changes, commit with custom messages, and view project history directly within the workspace.
-- **Hybrid IDE Layout**: A professional, multiplexed interface with a full-height primary sidebar, a persistent global title bar with workspace tabs, and a utility-focused right sidebar.
-- **The Swarm Builder**: A premium, multi-step onboarding experience for creating your workspace with a live grid preview.
-- **Predictive Launching (Speed Booting)**: Reduces perceived latency by pre-spawning agent PTY processes in the background while you configure your swarm.
-- **Mixed Workspace Launcher**: Combine terminal agents and browser tiles in one launch.
-- **Multiplexed Grid Workspace**: Auto-layout optimized for 1 to 12+ sessions.
-- **PTY-Backed Terminals**: Rust + `portable-pty` process management with WebGL-enabled xterm.js rendering.
-- **Workspace Tabs**: Create, rename, recolor, and close workspaces with ease.
-- **Custom Window Chrome**: Integrated title bar and native-feeling window controls with viewport-anchored management buttons.
+![Lattice Social Preview](docs/social-preview.svg)
 
-## Browser Tile Behavior
+---
 
-Browser sessions are currently embedded as in-app webview frames.
+## ✨ Why Lattice?
 
-- Great for local dev URLs (`http://localhost:3000`, etc.).
-- Some major websites (for example Google) block iframe/embed access via security headers (`X-Frame-Options` / CSP `frame-ancestors`).
-- If a site refuses to load, this is expected behavior from the target site, not a Lattice crash.
+Orchestrating multiple AI agents (like Claude, Gemini, or custom scripts) in traditional terminal tabs is cumbersome. Lattice transforms your workspace into a **reactive grid**, allowing you to monitor and interact with a "swarm" of processes simultaneously without context switching.
 
-## Tech Stack
+## 🚀 Key Features
 
-- Backend: Rust, Tauri v2, `portable-pty`
-- Frontend: SolidJS, TypeScript, Vite
-- Terminal: xterm.js (`@xterm/xterm`, fit + webgl addons)
-- IPC: Tauri command + event bridge
+- **🧩 The Grid (Zero-Scroll)**: A workspace that always fits your viewport. Terminals are perfectly adjacent with no gaps, optimized for 4, 6, 8, or 12+ sessions.
+- **⚡ PTY-Backed Performance**: Utilizing `portable-pty` and Rust's `tokio` for near-zero latency I/O.
+- **🛠 Swarm Builder**: A multi-step onboarding experience to configure mixed session layouts (Native, WSL, Browser) with a live grid preview.
+- **📁 Integrated Workspace Explorer**: High-fidelity file navigation with branded icons for Rust, Python, TS, Docker, and more.
+- **📡 Server Management**: Automatically discover background services, view clean logs (ANSI-stripped), and manage process lifecycles.
+- **🌳 Git First-Class**: Stage changes, commit, and view history directly within the IDE-like interface.
+- **🎨 Modern Aesthetics**: Standardized on the **Campbell (PowerShell)** theme with **Cascadia Code** and WebGL-accelerated rendering via `xterm.js`.
 
-## Getting Started
+---
 
-### Prerequisites
+## 🛠 Tech Stack
 
-- Rust toolchain
-- Node.js 18+
-- Tauri system prerequisites for your OS
+| Component | Technology |
+| :--- | :--- |
+| **Backend** | Rust (Tauri v2), `portable-pty`, `tokio` |
+| **Frontend** | SolidJS, TypeScript, Vite |
+| **Terminal** | `xterm.js` (WebGL enabled) |
+| **Styling** | Vanilla CSS + Reactive CSS Grid |
+| **IPC** | Tauri Command + Event Bridge (Zero-Latency) |
 
-### Install
+---
 
+## 📥 Getting Started
+
+### For Users (Download)
+Lattice is currently in early access (**v0.1.2**). You can find the latest installers for Windows and Linux in the [Releases](https://github.com/YuvalHir/Lattice/releases) section.
+
+### For Developers (Build from Source)
+
+**Prerequisites:**
+- [Rust Toolchain](https://www.rust-lang.org/tools/install)
+- [Node.js 18+](https://nodejs.org/)
+- [Tauri Prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites)
+
+**Installation:**
 ```bash
+# Clone the repository
 git clone https://github.com/YuvalHir/Lattice.git
 cd Lattice
+
+# Install dependencies
 npm install
-```
 
-### Run
-
-```bash
+# Run in development mode
 npm run tauri dev
 ```
 
-## Troubleshooting
+---
 
-### `Cannot find native binding` / missing optional dependency
+## 🏗 Architecture Overview
 
-If you see errors such as missing `@tauri-apps/cli-win32-x64-msvc` (Windows) or rollup native packages, rebuild dependencies on the same OS where you run the app:
+Lattice uses a thread-safe, centralized **Session Registry** in Rust to track active terminals.
+- **Global State**: Managed via `Arc<Mutex<SessionRegistry>>`.
+- **I/O Pipeline**: Dedicated `tokio` tasks monitor process `stdout/stderr` and emit raw byte streams to the frontend via Tauri events.
+- **OS Bridge**: Seamlessly abstracts execution between Native Windows (`cmd`/`powershell`) and WSL.
 
-```powershell
-rmdir /s /q node_modules
-del package-lock.json
-npm install --include=optional
-```
+For a deep dive, see:
+- [Backend Architecture](docs/ARCHITECTURE_BACKEND.md)
+- [Frontend Architecture](docs/ARCHITECTURE_FRONTEND.md)
+- [IPC & Data Flow](docs/ARCHITECTURE_IPC_AND_DATA.md)
 
-Then run:
+---
 
-```powershell
-npm run tauri dev
-```
+## 🔖 Versioning & Releases
 
-Do not reuse `node_modules` across WSL/Linux and Windows runs.
+We follow [Semantic Versioning (SemVer)](https://semver.org/). 
+- **Major**: Breaking changes.
+- **Minor**: New features (e.g., New session types).
+- **Patch**: Bug fixes and performance tweaks.
+
+Check our [Changelog](CHANGELOG.md) for detailed release notes.
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<p align="center">
+  Built with ❤️ for the AI Agent Community by <a href="https://github.com/YuvalHir">YuvalHir</a>
+</p>

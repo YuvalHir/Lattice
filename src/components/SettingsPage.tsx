@@ -8,8 +8,10 @@ import {
   type AppSettings,
   type SessionType,
 } from "../store/settingsStore";
+import { checkForUpdates } from "../init";
+import { getVersion } from "@tauri-apps/api/app";
 
-type SettingsCategory = "common" | "terminal" | "sessions" | "shortcuts";
+type SettingsCategory = "common" | "terminal" | "sessions" | "shortcuts" | "about";
 
 interface SettingsPageProps {
   isActive: boolean;
@@ -21,15 +23,23 @@ const SETTINGS_CATEGORIES: { id: SettingsCategory; label: string; icon: string }
   { id: "terminal", label: "Terminal", icon: "▮" },
   { id: "sessions", label: "Sessions", icon: "◫" },
   { id: "shortcuts", label: "Keyboard Shortcuts", icon: "⌨" },
+  { id: "about", label: "About", icon: "ⓘ" },
 ];
 
 export const SettingsPage = (props: SettingsPageProps) => {
   const [activeCategory, setActiveCategory] = createSignal<SettingsCategory>("common");
   const [draft, setDraft] = createSignal<AppSettings>({ ...settingsStore });
+  const [appVersion, setAppVersion] = createSignal<string>("...");
+  const [isCheckingUpdates, setIsCheckingUpdates] = createSignal(false);
 
-  createEffect(() => {
+  createEffect(async () => {
     if (props.isActive) {
       setDraft({ ...settingsStore });
+      try {
+        setAppVersion(await getVersion());
+      } catch (e) {
+        console.error("Failed to get app version:", e);
+      }
     }
   });
 
@@ -56,6 +66,12 @@ export const SettingsPage = (props: SettingsPageProps) => {
   const resetToDefaults = () => {
     resetSettings();
     setDraft({ ...defaultSettings });
+  };
+
+  const handleManualUpdateCheck = async () => {
+    setIsCheckingUpdates(true);
+    await checkForUpdates(true);
+    setIsCheckingUpdates(false);
   };
 
   const renderCommonSettings = () => (
@@ -246,6 +262,46 @@ export const SettingsPage = (props: SettingsPageProps) => {
     </div>
   );
 
+  const renderAboutSettings = () => (
+    <div class="settings-category-content">
+      <div class="settings-section">
+        <h3 class="settings-section-title">Lattice</h3>
+        <p class="settings-section-description">Application information and updates</p>
+
+        <div class="settings-item">
+          <div class="settings-item-header">
+            <label class="settings-item-label">Version</label>
+            <span class="settings-item-id">app.version</span>
+          </div>
+          <div class="settings-version-display">{appVersion()}</div>
+        </div>
+
+        <div class="settings-item">
+          <div class="settings-item-header">
+            <label class="settings-item-label">Check for Updates</label>
+            <span class="settings-item-id">app.updater</span>
+          </div>
+          <button 
+            class="settings-action-btn" 
+            onClick={handleManualUpdateCheck}
+            disabled={isCheckingUpdates()}
+          >
+            {isCheckingUpdates() ? "Checking..." : "Check for Updates"}
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3 class="settings-section-title">Legal</h3>
+        <p class="settings-section-description">Open source licenses and terms</p>
+        <div class="settings-note">
+          <span class="settings-note-icon">⚖</span>
+          <span>Lattice is licensed under the MIT License. Built with Tauri and SolidJS.</span>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div class="settings-page" classList={{ active: props.isActive }}>
       {/* Settings Sidebar */}
@@ -300,6 +356,7 @@ export const SettingsPage = (props: SettingsPageProps) => {
         <Show when={activeCategory() === "terminal"}>{renderTerminalSettings()}</Show>
         <Show when={activeCategory() === "sessions"}>{renderSessionsSettings()}</Show>
         <Show when={activeCategory() === "shortcuts"}>{renderShortcutsSettings()}</Show>
+        <Show when={activeCategory() === "about"}>{renderAboutSettings()}</Show>
       </main>
     </div>
   );
