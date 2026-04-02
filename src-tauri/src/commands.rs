@@ -68,6 +68,70 @@ struct ProcessExitPayload {
     pub exit_code: Option<i32>,
 }
 
+fn flush_buffer(
+    app: &AppHandle,
+    id: &str,
+    byte_buffer: &mut Vec<u8>,
+    spoof_tx: &mpsc::Sender<Vec<u8>>,
+) {
+    if byte_buffer.is_empty() {
+        return;
+    }
+
+    // Filter out null bytes which can cause issues in some webview implementations
+    let cleaned_bytes: Vec<u8> = byte_buffer
+        .iter()
+        .cloned()
+        .filter(|&b| b != 0x00)
+        .collect();
+
+    if cleaned_bytes.is_empty() {
+        byte_buffer.clear();
+        return;
+    }
+
+    // Robust UTF-8 handling:
+    // 1. If valid, emit all.
+    // 2. If partial at end, emit valid part and keep tail.
+    // 3. If invalid sequence, use lossy conversion and clear buffer.
+    let (to_emit, to_keep) = match std::str::from_utf8(&cleaned_bytes) {
+        Ok(s) => (s.to_string(), Vec::new()),
+        Err(e) => {
+            let valid_len = e.valid_up_to();
+            if e.error_len().is_none() {
+                // Incomplete sequence at the end, wait for more bytes
+                let (valid, rest) = cleaned_bytes.split_at(valid_len);
+                (
+                    unsafe { std::str::from_utf8_unchecked(valid) }.to_string(),
+                    rest.to_vec(),
+                )
+            } else {
+                // Truly invalid UTF-8 (e.g. binary data). Use lossy to recover what we can.
+                (String::from_utf8_lossy(&cleaned_bytes).into_owned(), Vec::new())
+            }
+        }
+    };
+
+    if !to_emit.is_empty() {
+        // TTY-Spoof: Respond to cursor position requests commonly used by shell tools
+        if to_emit.contains("\x1b[6n") {
+            let _ = spoof_tx.try_send(b"\x1b[1;1R".to_vec());
+        }
+
+        let _ = app.emit(
+            "terminal-output",
+            TerminalOutputPayload {
+                id: id.to_string(),
+                data: to_emit,
+            },
+        );
+    }
+
+    // Retain only the partial tail for the next accumulation cycle
+    byte_buffer.clear();
+    byte_buffer.extend(to_keep);
+}
+
 #[tauri::command]
 pub async fn spawn_process(
     app: AppHandle,
@@ -112,43 +176,52 @@ pub async fn spawn_process(
     let mut master_reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
     let mut master_writer = pair.master.take_writer().map_err(|e| e.to_string())?;
 
-    let (stdin_tx, mut stdin_rx) = mpsc::channel::<Vec<u8>>(100);
-    
-    // TTY-Spoofing channel: Internal channel to send responses back to the process
+    let (stdin_tx, mut stdin_rx) = mpsc::channel::<Vec<u8>>(1024);
+    let (output_tx, mut output_rx) = mpsc::channel::<Vec<u8>>(1024);
     let (spoof_tx, mut spoof_rx) = mpsc::channel::<Vec<u8>>(10);
 
-    // Reader thread
-    let app_reader = app.clone();
-    let session_id_reader = session_id.clone();
-    let spoof_tx_clone = spoof_tx.clone();
-    
+    // 1. Dedicated Reader Thread (Low-latency blocking reads)
     std::thread::spawn(move || {
-        let mut buffer = [0u8; 4096];
+        let mut buffer = [0u8; 8192];
         loop {
             match master_reader.read(&mut buffer) {
                 Ok(n) if n > 0 => {
-                    let cleaned_bytes: Vec<u8> =
-                        buffer[..n].iter().cloned().filter(|&b| b != 0x00).collect();
-
-                    if !cleaned_bytes.is_empty() {
-                        let data_str = String::from_utf8_lossy(&cleaned_bytes).into_owned();
-                        
-                        // TTY-Spoof: If we see a cursor position request (\x1b[6n), queue a response.
-                        if data_str.contains("\x1b[6n") {
-                            let _ = spoof_tx_clone.try_send(b"\x1b[1;1R".to_vec());
-                        }
-
-                        // println!("[PTY] Emitting {} bytes for session {}: {:?}", cleaned_bytes.len(), session_id_reader, data_str);
-                        let _ = app_reader.emit(
-                            "terminal-output",
-                            TerminalOutputPayload {
-                                id: session_id_reader.clone(),
-                                data: data_str,
-                            },
-                        );
+                    // Send directly to the aggregator/throttler
+                    if output_tx.blocking_send(buffer[..n].to_vec()).is_err() {
+                        break;
                     }
                 }
-                Ok(_) | Err(_) => break,
+                _ => break,
+            }
+        }
+    });
+
+    // 2. Throttled Aggregator Task (Runs on Tokio)
+    let app_emitter = app.clone();
+    let session_id_emitter = session_id.clone();
+    let spoof_tx_clone = spoof_tx.clone();
+    
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(20));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        
+        let mut byte_buffer = Vec::with_capacity(16384);
+
+        loop {
+            tokio::select! {
+                Some(data) = output_rx.recv() => {
+                    byte_buffer.extend(data);
+                    // Force flush if buffer is getting huge to prevent extreme latency spikes
+                    if byte_buffer.len() > 32768 {
+                        flush_buffer(&app_emitter, &session_id_emitter, &mut byte_buffer, &spoof_tx_clone);
+                    }
+                }
+                _ = interval.tick() => {
+                    if !byte_buffer.is_empty() {
+                        flush_buffer(&app_emitter, &session_id_emitter, &mut byte_buffer, &spoof_tx_clone);
+                    }
+                }
+                else => break,
             }
         }
     });

@@ -220,7 +220,6 @@ export function stripAnsi(text: string): string {
  * Appends output data to a session's buffer.
  */
 export function appendOutput(id: string, data: string) {
-  console.log(`[sessionStore] Appending ${data.length} bytes to session ${id}`);
   setStore('sessions', id, 'buffer', (prev) => {
     const combined = prev + data;
     if (combined.length > MAX_BUFFER_SIZE) {

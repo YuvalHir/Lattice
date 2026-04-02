@@ -79,17 +79,23 @@ export async function initializeApp() {
 
   // Start listening for terminal output from the backend
   const unlistenOutput = await listenToTerminalOutput((payload) => {
-    // Persist to store for history/catch-up.
+    // 1. Persist to store for history/catch-up.
     appendOutput(payload.id, payload.data);
 
-    // Direct-pipe active workspace output for low-latency interactive CLIs (Gemini/Claude/Codex).
-    // TerminalWrapper keeps lastWrittenIndex in sync to avoid duplicate rendering.
+    // 2. Direct-pipe active workspace output for low-latency interactive CLIs.
     const term = terminalRegistry.get(payload.id);
-    if (term) {
-      const ws = sessionStore.workspaces.find(w => w.sessionIds.includes(payload.id));
-      if (ws && ws.id === sessionStore.activeWorkspaceId) {
-        term.write(payload.data);
-      }
+    if (!term) return;
+
+    // Optimization: If it's the absolutely focused session, write immediately.
+    if (payload.id === sessionStore.activeId) {
+      term.write(payload.data);
+      return;
+    }
+
+    // Fallback: Check if it's part of the currently visible workspace (multi-terminal view).
+    const activeWs = sessionStore.workspaces.find(w => w.id === sessionStore.activeWorkspaceId);
+    if (activeWs && activeWs.sessionIds.includes(payload.id)) {
+      term.write(payload.data);
     }
   });
 
