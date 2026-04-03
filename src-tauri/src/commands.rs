@@ -7,6 +7,36 @@ use sysinfo::{Pid, ProcessesToUpdate, System};
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::{mpsc, Mutex};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+trait CommandNoWindow {
+    fn no_window(&mut self) -> &mut Self;
+}
+
+impl CommandNoWindow for tokio::process::Command {
+    fn no_window(&mut self) -> &mut Self {
+        #[cfg(windows)]
+        {
+            self.as_std_mut().creation_flags(CREATE_NO_WINDOW);
+        }
+        self
+    }
+}
+
+impl CommandNoWindow for std::process::Command {
+    fn no_window(&mut self) -> &mut Self {
+        #[cfg(windows)]
+        {
+            self.creation_flags(CREATE_NO_WINDOW);
+        }
+        self
+    }
+}
+
 #[tauri::command]
 pub async fn check_directory_exists(path: String) -> bool {
     let p = std::path::Path::new(&path);
@@ -371,6 +401,7 @@ pub async fn kill_process(
             .arg("/T")
             .arg("/PID")
             .arg(pid.to_string())
+            .no_window()
             .spawn()
             .map_err(|e| e.to_string())?;
         let _ = kill.wait();
@@ -380,6 +411,7 @@ pub async fn kill_process(
         let mut kill = std::process::Command::new("kill")
             .arg("-9")
             .arg(pid.to_string())
+            .no_window()
             .spawn()
             .map_err(|e| e.to_string())?;
         let _ = kill.wait();
@@ -401,6 +433,7 @@ pub async fn kill_pid(pid: u32) -> Result<(), String> {
             .arg("/T")
             .arg("/PID")
             .arg(pid.to_string())
+            .no_window()
             .spawn()
             .map_err(|e| e.to_string())?;
         let _ = kill.wait();
@@ -410,6 +443,7 @@ pub async fn kill_pid(pid: u32) -> Result<(), String> {
         let mut kill = std::process::Command::new("kill")
             .arg("-9")
             .arg(pid.to_string())
+            .no_window()
             .spawn()
             .map_err(|e| e.to_string())?;
         let _ = kill.wait();
@@ -454,6 +488,7 @@ pub async fn get_all_services(
                 "-Command",
                 "Get-NetTCPConnection -State Listen | Select-Object LocalPort, OwningProcess | ConvertTo-Json",
             ])
+            .no_window()
             .output()
             .await
             .map_err(|e| e.to_string())?;
@@ -482,6 +517,7 @@ pub async fn get_all_services(
     {
         let output = tokio::process::Command::new("ss")
             .args(["-tunlp"])
+            .no_window()
             .output()
             .await
             .map_err(|e| e.to_string())?;
@@ -628,6 +664,7 @@ pub async fn get_git_info(cwd: String) -> Result<GitInfo, String> {
     let output = tokio::process::Command::new("git")
         .args(["rev-parse", "--is-inside-work-tree"])
         .current_dir(&cwd)
+        .no_window()
         .output()
         .await
         .map_err(|e| e.to_string())?;
@@ -642,6 +679,7 @@ pub async fn get_git_info(cwd: String) -> Result<GitInfo, String> {
     let branch_output = tokio::process::Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .current_dir(&cwd)
+        .no_window()
         .output()
         .await
         .map_err(|e| e.to_string())?;
@@ -665,6 +703,7 @@ pub async fn git_status(cwd: String) -> Result<Vec<GitFileStatus>, String> {
     let output = tokio::process::Command::new("git")
         .args(["status", "--porcelain"])
         .current_dir(&cwd)
+        .no_window()
         .output()
         .await
         .map_err(|e| e.to_string())?;
@@ -717,6 +756,7 @@ pub async fn git_add(cwd: String, path: String) -> Result<(), String> {
     let status = tokio::process::Command::new("git")
         .args(["add", &path])
         .current_dir(&cwd)
+        .no_window()
         .status()
         .await
         .map_err(|e| e.to_string())?;
@@ -733,6 +773,7 @@ pub async fn git_unstage(cwd: String, path: String) -> Result<(), String> {
     let status = tokio::process::Command::new("git")
         .args(["reset", "HEAD", "--", &path])
         .current_dir(&cwd)
+        .no_window()
         .status()
         .await
         .map_err(|e| e.to_string())?;
@@ -749,6 +790,7 @@ pub async fn git_commit(cwd: String, message: String) -> Result<(), String> {
     let status = tokio::process::Command::new("git")
         .args(["commit", "-m", &message])
         .current_dir(&cwd)
+        .no_window()
         .status()
         .await
         .map_err(|e| e.to_string())?;
@@ -765,6 +807,7 @@ pub async fn git_push(cwd: String) -> Result<(), String> {
     let status = tokio::process::Command::new("git")
         .args(["push"])
         .current_dir(&cwd)
+        .no_window()
         .status()
         .await
         .map_err(|e| e.to_string())?;
@@ -781,6 +824,7 @@ pub async fn git_init(cwd: String) -> Result<(), String> {
     let status = tokio::process::Command::new("git")
         .args(["init"])
         .current_dir(&cwd)
+        .no_window()
         .status()
         .await
         .map_err(|e| e.to_string())?;
@@ -797,6 +841,7 @@ pub async fn git_add_all(cwd: String) -> Result<(), String> {
     let status = tokio::process::Command::new("git")
         .args(["add", "."])
         .current_dir(&cwd)
+        .no_window()
         .status()
         .await
         .map_err(|e| e.to_string())?;
@@ -813,6 +858,7 @@ pub async fn get_git_log(cwd: String) -> Result<Vec<GitCommit>, String> {
     let output = tokio::process::Command::new("git")
         .args(["log", "--pretty=format:%h|%an|%ar|%s", "-n", "20"])
         .current_dir(&cwd)
+        .no_window()
         .output()
         .await
         .map_err(|e| e.to_string())?;
