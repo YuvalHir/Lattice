@@ -26,7 +26,27 @@
   padding: 0;
 }
 
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-main);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
+
 body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-main) transparent;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background-color: var(--bg-app);
   color: var(--text-main);
@@ -159,6 +179,30 @@ body {
   height: 100%;
   border: none;
   background: #fff; /* Keep white for browser iframe */
+  color-scheme: dark;
+  scrollbar-color: #555 #222;
+}
+
+.browser-pane {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-main) transparent;
+}
+
+.browser-pane::-webkit-scrollbar {
+  width: 8px;
+}
+
+.browser-pane::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.browser-pane::-webkit-scrollbar-thumb {
+  background: var(--border-main);
+  border-radius: 4px;
+}
+
+.browser-pane::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
 }
 
 .tile-header {
@@ -530,6 +574,29 @@ body {
   background: rgba(255, 255, 255, 0.05);
   color: white;
   border-color: rgba(255, 255, 255, 0.4);
+}
+
+.btn-browse {
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-browse:hover {
+  background: color-mix(in srgb, var(--accent-primary) 85%, white);
+  transform: translateY(-1px);
+}
+
+.btn-browse:active {
+  transform: translateY(0);
 }
 
 .preset-chip {
