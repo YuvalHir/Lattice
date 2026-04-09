@@ -1,4 +1,5 @@
 import { createStore } from "solid-js/store";
+import type { RecentWorkspace } from "../types/schema";
 
 export const SESSION_TYPES = ["Gemini", "Claude", "Codex", "OpenCode", "WSL", "Browser", "Terminal"] as const;
 export type SessionType = typeof SESSION_TYPES[number];
@@ -13,6 +14,7 @@ export interface AppSettings {
   terminalFontSize: number;
   defaultShell: "PowerShell" | "CMD" | "WSL" | "Native";
   defaultSessionCounts: Record<SessionType, number>;
+  recentWorkspaces: RecentWorkspace[];
 }
 
 export const defaultSettings: AppSettings = {
@@ -30,6 +32,7 @@ export const defaultSettings: AppSettings = {
     Browser: 0,
     Terminal: 0,
   },
+  recentWorkspaces: [],
 };
 
 function sanitizeSettings(raw: unknown): AppSettings {
@@ -72,6 +75,7 @@ function sanitizeSettings(raw: unknown): AppSettings {
       Browser: Math.max(0, Number(sessionCounts.Browser ?? defaultSettings.defaultSessionCounts.Browser)),
       Terminal: Math.max(0, Number(sessionCounts.Terminal ?? defaultSettings.defaultSessionCounts.Terminal)),
     },
+    recentWorkspaces: Array.isArray(candidate.recentWorkspaces) ? candidate.recentWorkspaces.filter(ws => ws.name && ws.cwd && ws.items) : [],
   };
 }
 
@@ -109,4 +113,36 @@ export function setTerminalFontSize(size: number) {
 
 export function resetSettings() {
   updateSettings(defaultSettings);
+}
+
+export function addRecentWorkspace(name: string, cwd: string, items: string[], browserUrl?: string) {
+  const newRecent: RecentWorkspace = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    name,
+    cwd,
+    items,
+    browserUrl,
+    lastUsed: new Date().toISOString()
+  };
+
+  // Check if same workspace exists (same name and cwd)
+  const existingIndex = store.recentWorkspaces.findIndex(ws => ws.name === name && ws.cwd === cwd);
+  let updatedWorkspaces = [...store.recentWorkspaces];
+  
+  if (existingIndex !== -1) {
+    // Remove existing and add to front with new timestamp
+    updatedWorkspaces.splice(existingIndex, 1);
+  }
+  
+  updatedWorkspaces.unshift(newRecent);
+  
+  // Limit to top 5
+  updatedWorkspaces = updatedWorkspaces.slice(0, 5);
+  
+  updateSettings({ ...store, recentWorkspaces: updatedWorkspaces });
+}
+
+export function removeRecentWorkspace(id: string) {
+  const updatedWorkspaces = store.recentWorkspaces.filter(ws => ws.id !== id);
+  updateSettings({ ...store, recentWorkspaces: updatedWorkspaces });
 }

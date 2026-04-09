@@ -26,6 +26,15 @@ export interface LauncherPreset {
   };
 }
 
+export interface RecentWorkspace {
+  id: string;
+  name: string;
+  cwd: string;
+  items: string[]; // WorkspaceLaunchItem[] as string[] for easier storage
+  browserUrl?: string;
+  lastUsed: string; // ISO timestamp
+}
+
 /**
  * Tauri Event Payloads
  */

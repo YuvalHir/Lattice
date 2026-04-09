@@ -216,6 +216,44 @@ body {
   min-width: 80px;
 }
 
+.tile-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.terminal-tile:hover .tile-header-actions,
+.glass-pane-active .tile-header-actions {
+  opacity: 1;
+}
+
+.tile-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tile-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+}
+
+.tile-action-btn.danger:hover {
+  background: #f85149;
+  color: white;
+}
+
 /* Modal */
 /* Modal Framework */
 .modal-overlay {
@@ -1251,4 +1289,26 @@ body {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* Recent Workspace Styles */
+.recent-workspace-card:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--accent-primary) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.recent-workspace-card:hover .remove-recent-btn {
+  opacity: 0.6 !important;
+}
+
+.remove-recent-btn:hover {
+  opacity: 1 !important;
+  color: #f85149 !important;
+}
+
+.recent-workspace-card:active {
+  transform: translateY(0);
+  background: rgba(255, 255, 255, 0.08) !important;
 }

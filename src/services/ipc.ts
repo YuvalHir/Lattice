@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn, type Event } from '@tauri-apps/api/event';
 import type { LauncherPreset, TerminalOutputPayload } from '../types/schema';
-import { addSession, terminateSession, addWorkspace, addBrowserSession, updateSessionPid } from '../store/sessionStore';
+import { addSession, terminateSession, addWorkspace, addBrowserSession, updateSessionPid, setSessionBackgroundStatus, removeSession, removeWorkspace, sessionStore } from '../store/sessionStore';
 import { settingsStore } from '../store/settingsStore';
 
 /**
@@ -158,6 +158,7 @@ export async function launchWorkspace(
     // If it was already in the store (pre-launched), just return ID
     if (usePreLaunched) {
       console.log(`[LAUNCHER] Adopting pre-launched session (${item}) in ${cwd}: ${sessionId}`);
+      setSessionBackgroundStatus(sessionId, false);
       return sessionId;
     }
 
@@ -185,6 +186,15 @@ export async function launchWorkspace(
   const results = await Promise.all(launchPromises);
   const activeIds = results.filter((id): id is string => id !== null);
 
+  // Cleanup any remaining pre-launched sessions that were not adopted
+  Object.values(preLaunchedQueues).forEach(ids => {
+    ids.forEach(id => {
+      console.log(`[LAUNCHER] Cleaning up un-adopted pre-launched session: ${id}`);
+      killProcess(id).catch(() => {});
+      terminateSession(id, 0);
+    });
+  });
+
   console.log(`[LAUNCHER] Launch sequence complete. Active agents: ${activeIds.length}`);
   if (items.length > 0 && activeIds.length === 0) {
     throw new Error("Workspace launch failed: no sessions were started.");
@@ -199,6 +209,31 @@ export async function writeToStdin(id: string, data: number[]): Promise<void> {
 
 export async function killProcess(id: string): Promise<void> {
   await invoke<void>('kill_process', { id });
+}
+
+/**
+ * High-level function to kill a session's backend process and then remove it from the frontend store.
+ */
+export async function closeSession(id: string) {
+  try {
+    await killProcess(id);
+  } catch (e) {
+    console.warn(`[IPC] Failed to kill process ${id} during close:`, e);
+  } finally {
+    removeSession(id);
+  }
+}
+
+/**
+ * High-level function to kill all sessions in a workspace and then remove the workspace.
+ */
+export async function closeWorkspace(id: string) {
+  const ws = sessionStore.workspaces.find(w => w.id === id);
+  if (ws) {
+    // Kill all sessions in the workspace in parallel
+    await Promise.allSettled(ws.sessionIds.map(sid => killProcess(sid)));
+  }
+  removeWorkspace(id);
 }
 
 export async function resizeTerminal(id: string, rows: number, cols: number): Promise<void> {

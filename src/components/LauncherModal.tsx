@@ -8,12 +8,14 @@ import {
   SESSION_TYPES,
   settingsStore,
   type SessionType,
+  addRecentWorkspace,
 } from "../store/settingsStore";
-import { addSession, terminateSession, updateSessionPid, removeSession } from "../store/sessionStore";
+import { addSession, terminateSession, updateSessionPid, removeSession, addSessionToWorkspace, addBrowserSession, sessionStore } from "../store/sessionStore";
 
 interface LauncherModalProps {
   isOpen: boolean;
   onClose: () => void;
+  targetWorkspaceId?: string | null;
 }
 
 type SessionCounts = Record<SessionType, number>;
@@ -68,8 +70,28 @@ const AGENT_ICONS: Record<SessionType, JSX.Element> = {
   ),
 };
 
+
 export const LauncherModal = (props: LauncherModalProps) => {
   const [step, setStep] = createSignal<Step>("basics");
+
+  // Initialize step and values if adding to existing workspace
+  createEffect(() => {
+    if (props.isOpen && props.targetWorkspaceId) {
+      setStep("swarm");
+      const ws = sessionStore.workspaces.find(w => w.id === props.targetWorkspaceId);
+      if (ws) {
+        setSelectedDir(ws.cwd);
+        setWorkspaceName(ws.name);
+        setSessionCounts({
+          Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0, Terminal: 1
+        });
+      }
+    } else if (props.isOpen) {
+      setStep("basics");
+      setSessionCounts({ ...settingsStore.defaultSessionCounts });
+    }
+  });
+
   const [selectedDir, setSelectedDir] = createSignal<string | null>(null);
   const [workspaceName, setWorkspaceName] = createSignal("");
   const [url, setUrl] = createSignal("");
@@ -240,13 +262,51 @@ export const LauncherModal = (props: LauncherModalProps) => {
 
     try {
       if (settingsStore.rememberLastDirectory) localStorage.setItem(LAST_WORKING_DIR_KEY, selectedDir()!);
-      await launchWorkspace(
-        workspaceName() || settingsStore.defaultWorkspaceName, 
-        selectedDir()!, 
-        sessionsToLaunch, 
-        url(),
-        preLaunched()
-      );
+      
+      if (props.targetWorkspaceId) {
+        // ADD TO EXISTING WORKSPACE
+        console.log(`[LAUNCHER] Adding ${sessionsToLaunch.length} agents to workspace ${props.targetWorkspaceId}`);
+        const workspaceId = props.targetWorkspaceId;
+        const cwd = selectedDir()!;
+        
+        for (const item of sessionsToLaunch) {
+          const sessionId = `${workspaceId}-added-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+          if (item === 'Browser') {
+            addBrowserSession(sessionId, url(), 'Browser');
+            addSessionToWorkspace(workspaceId, sessionId);
+          } else {
+            const basePreset = PRESETS[item as keyof typeof PRESETS];
+            if (basePreset) {
+              const preset = { ...basePreset, id: sessionId, cwd };
+              addSession(sessionId, 0, preset);
+              addSessionToWorkspace(workspaceId, sessionId);
+              spawnProcess(preset).then(pid => {
+                updateSessionPid(sessionId, pid);
+              }).catch(err => {
+                console.error(`[LAUNCHER] Failed to spawn added agent ${item}:`, err);
+                removeSession(sessionId);
+              });
+            }
+          }
+        }
+      } else {
+        // CREATE NEW WORKSPACE
+        await launchWorkspace(
+          workspaceName() || settingsStore.defaultWorkspaceName, 
+          selectedDir()!, 
+          sessionsToLaunch, 
+          url(),
+          preLaunched()
+        );
+        
+        addRecentWorkspace(
+          workspaceName() || settingsStore.defaultWorkspaceName,
+          selectedDir()!,
+          sessionsToLaunch,
+          url()
+        );
+      }
+
       // Neutralize preLaunched map as they are now "adopted"
       setPreLaunched({ Gemini: [], Claude: [], Codex: [], OpenCode: [], WSL: [], Browser: [] });
       props.onClose();

@@ -267,6 +267,13 @@ export function removeSession(id: string) {
 }
 
 /**
+ * Adds a session ID to a specific workspace.
+ */
+export function addSessionToWorkspace(workspaceId: string, sessionId: string) {
+  setStore('workspaces', (ws) => ws.id === workspaceId, 'sessionIds', (ids) => [...ids, sessionId]);
+}
+
+/**
  * Removes a workspace and all its sessions.
  */
 export function removeWorkspace(id: string) {
@@ -288,4 +295,11 @@ export function removeWorkspace(id: string) {
  */
 export function updateSessionPid(id: string, pid: number) {
   setStore('sessions', id, (s) => (s ? { ...s, pid } : s));
+}
+
+/**
+ * Updates the background status of a session.
+ */
+export function setSessionBackgroundStatus(id: string, isBackground: boolean) {
+  setStore('sessions', id, (s) => (s ? { ...s, isBackground } : s));
 }

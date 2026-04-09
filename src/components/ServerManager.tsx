@@ -29,6 +29,24 @@ const ServerManager: Component = () => {
   onMount(async () => {
     const home = await homeDir();
     setNewCwd(home);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (viewingLogId()) {
+          e.stopPropagation();
+          setViewingLogId(null);
+        } else if (isLaunching()) {
+          e.stopPropagation();
+          setIsLaunching(false);
+        } else if (editingPid()) {
+          e.stopPropagation();
+          setEditingPid(null);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true); // Use capture to handle before App.tsx
+    onCleanup(() => window.removeEventListener('keydown', handleKeyDown, true));
   });
 
   // Poll for services every 5 seconds
@@ -75,6 +93,11 @@ const ServerManager: Component = () => {
   };
 
   const handleQuickCd = async (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      setIsLaunching(false);
+      return;
+    }
     if (e.key === 'Enter') {
       e.stopPropagation();
       const val = quickCd().trim();
@@ -149,6 +172,8 @@ const ServerManager: Component = () => {
   };
 
   const saveRename = (service: ServiceInfo) => {
+    if (editingPid() !== service.pid) return;
+
     const newVal = editValue().trim();
     if (newVal) {
       if (service.is_managed && service.session_id) {
@@ -248,7 +273,14 @@ const ServerManager: Component = () => {
                             value={editValue()} 
                             onInput={(e) => setEditValue(e.currentTarget.value)}
                             onBlur={() => saveRename(service)}
-                            onKeyDown={(e) => e.key === 'Enter' && saveRename(service)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveRename(service);
+                              if (e.key === 'Escape') {
+                                e.stopPropagation();
+                                setEditingPid(null);
+                                e.currentTarget.blur();
+                              }
+                            }}
                             autofocus
                           />
                         </Show>
@@ -326,6 +358,10 @@ const ServerManager: Component = () => {
             <div class="launch-modal-content" 
                  onClick={(e) => e.stopPropagation()}
                  onKeyDown={(e) => {
+                   if (e.key === 'Escape') {
+                     e.stopPropagation();
+                     setIsLaunching(false);
+                   }
                    if (e.key === 'Enter' && !quickCd().trim() && newName() && newCommand()) {
                      launchBackgroundService();
                    }
@@ -339,6 +375,7 @@ const ServerManager: Component = () => {
                   placeholder="e.g. My API Server" 
                   value={newName()} 
                   onInput={(e) => setNewName(e.currentTarget.value)}
+                  onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setIsLaunching(false))}
                   autofocus
                 />
               </div>
@@ -349,6 +386,7 @@ const ServerManager: Component = () => {
                   placeholder="e.g. npm run dev" 
                   value={newCommand()} 
                   onInput={(e) => setNewCommand(e.currentTarget.value)}
+                  onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setIsLaunching(false))}
                 />
               </div>
               <div class="form-group">
@@ -359,6 +397,7 @@ const ServerManager: Component = () => {
                     placeholder="Auto-detects current home if empty" 
                     value={newCwd()} 
                     onInput={(e) => setNewCwd(e.currentTarget.value)}
+                    onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setIsLaunching(false))}
                   />
                   <button onClick={handleBrowse}>Browse</button>
                 </div>

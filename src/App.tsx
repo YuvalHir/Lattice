@@ -2,7 +2,9 @@ import { createSignal, Show, For, onMount, onCleanup } from "solid-js";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 
-import { sessionStore, setActiveWorkspace, removeWorkspace, updateWorkspaceColor, renameWorkspace, WORKSPACE_COLORS } from "./store/sessionStore";
+import { sessionStore, setActiveWorkspace, updateWorkspaceColor, renameWorkspace, WORKSPACE_COLORS, toggleServerManager } from "./store/sessionStore";
+import { settingsStore, addRecentWorkspace, removeRecentWorkspace } from "./store/settingsStore";
+import { launchWorkspace, closeWorkspace, type WorkspaceLaunchItem } from "./services/ipc";
 import { Sidebar } from "./components/Sidebar";
 import { RightSidebar } from "./components/RightSidebar";
 import { SourceControlPanel } from "./components/SourceControlPanel";
@@ -16,6 +18,7 @@ import "./App.css";
 function App() {
   const appWindow = getCurrentWindow();
   const [isLauncherOpen, setIsLauncherOpen] = createSignal(false);
+  const [launcherTargetWorkspaceId, setLauncherTargetWorkspaceId] = createSignal<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = createSignal(false);
   const [editingWorkspaceId, setEditingWorkspaceId] = createSignal<string | null>(null);
   const [contextMenu, setContextMenu] = createSignal<{ x: number, y: number, id: string } | null>(null);
@@ -90,7 +93,7 @@ function App() {
         e.preventDefault();
         const activeId = sessionStore.activeWorkspaceId;
         if (activeId) {
-          removeWorkspace(activeId);
+          closeWorkspace(activeId);
         }
         return;
       }
@@ -99,6 +102,7 @@ function App() {
       if (e.key === "Escape") {
         if (isSettingsOpen()) setIsSettingsOpen(false);
         if (isLauncherOpen()) setIsLauncherOpen(false);
+        if (sessionStore.isServerManagerOpen) toggleServerManager();
       }
     };
 
@@ -144,6 +148,20 @@ function App() {
       await appWindow.unmaximize();
     } else {
       await appWindow.maximize();
+    }
+  };
+
+  const [isLaunchingRecent, setIsLaunchingRecent] = createSignal<string | null>(null);
+
+  const handleLaunchRecent = async (ws: any) => {
+    setIsLaunchingRecent(ws.id);
+    try {
+      await launchWorkspace(ws.name, ws.cwd, ws.items as WorkspaceLaunchItem[], ws.browserUrl);
+      addRecentWorkspace(ws.name, ws.cwd, ws.items, ws.browserUrl);
+    } catch (err) {
+      console.error("Failed to launch recent workspace:", err);
+    } finally {
+      setIsLaunchingRecent(null);
     }
   };
   
@@ -214,7 +232,7 @@ function App() {
                 <Show when={editingWorkspaceId() === ws.id} fallback={<span style={{ "font-size": "11px", "font-weight": "500", color: sessionStore.activeWorkspaceId === ws.id ? "var(--text-main)" : "var(--text-muted)", "white-space": "nowrap", "overflow": "hidden", "text-overflow": "ellipsis", "flex": 1 }}>{ws.name}</span>}>
                   <input autofocus value={ws.name} onBlur={(e) => handleRename(ws.id, e.currentTarget.value)} onKeyDown={(e) => { if (e.key === "Enter") handleRename(ws.id, e.currentTarget.value); if (e.key === "Escape") setEditingWorkspaceId(null); }} style={{ background: "transparent", border: "none", color: "var(--text-main)", "font-size": "11px", "font-weight": "500", width: "100%", outline: "none", padding: "0" }} onClick={(e) => e.stopPropagation()} />
                 </Show>
-                <span onClick={(e) => { e.stopPropagation(); removeWorkspace(ws.id); }} style={{ "margin-left": "8px", opacity: 0.5, "font-size": "14px", "display": "flex", "align-items": "center" }}>×</span>
+                <span onClick={(e) => { e.stopPropagation(); closeWorkspace(ws.id); }} style={{ "margin-left": "8px", opacity: 0.5, "font-size": "14px", "display": "flex", "align-items": "center" }}>×</span>
               </div>
             )}
           </For>
@@ -234,18 +252,150 @@ function App() {
           <main class="main-content">
             <section class="workspace-container" style={{ position: "relative", flex: 1 }}>
               <For each={sessionStore.workspaces}>
-                {(ws) => <Workspace workspaceId={ws.id} />}
+                {(ws) => (
+                  <Workspace 
+                    workspaceId={ws.id} 
+                    onLaunch={() => {
+                      setLauncherTargetWorkspaceId(ws.id);
+                      setIsLauncherOpen(true);
+                    }} 
+                  />
+                )}
               </For>
 
               <Show when={sessionStore.workspaces.length === 0}>
-                <div style={{ display: "flex", "flex-direction": "column", "align-items": "center", "justify-content": "center", height: "100%", background: "var(--bg-app)" }}>
-                  <div style={{ opacity: 0.2, "margin-bottom": "1rem" }}>
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 2L20.6603 7V17L12 22L3.33975 17V7L12 2Z" stroke="var(--text-main)" stroke-width="1"/>
+                <div style={{ display: "flex", "flex-direction": "column", "align-items": "center", "justify-content": "center", height: "100%", background: "var(--bg-app)", padding: "2rem" }}>
+                  <div style={{ opacity: 0.1, "margin-bottom": "2rem" }}>
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12 2L20.6603 7V17L12 22L3.33975 17V7L12 2Z" stroke="var(--text-main)" stroke-width="0.5"/>
                     </svg>
                   </div>
-                  <h2 style={{ "font-weight": "500", "font-size": "1.2rem", color: "var(--text-muted)" }}>LATTICE</h2>
-                  <p style={{ color: "#484f58", "font-size": "0.85rem", "margin-top": "0.5rem" }}>Select '+' to configure a new workspace.</p>
+                  
+                  <h2 style={{ "font-weight": "600", "font-size": "1.5rem", color: "var(--text-main)", "margin-bottom": "0.5rem", "letter-spacing": "-0.02em" }}>LATTICE</h2>
+                  <p style={{ color: "var(--text-muted)", "font-size": "0.9rem", "margin-bottom": "3rem" }}>Multiplexed Orchestration Environment</p>
+
+                  <div style={{ width: "100%", "max-width": "600px" }}>
+                    <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", "margin-bottom": "1rem", padding: "0 4px" }}>
+                      <span style={{ "font-size": "11px", "font-weight": "bold", color: "var(--text-muted)", "text-transform": "uppercase", "letter-spacing": "0.05em" }}>
+                        {settingsStore.recentWorkspaces.length > 0 ? "Recent Workspaces" : "Get Started"}
+                      </span>
+                      <button 
+                        onClick={() => setIsLauncherOpen(true)}
+                        style={{ background: "transparent", border: "none", color: "var(--accent-primary)", "font-size": "11px", "font-weight": "600", cursor: "pointer", padding: "4px 8px" }}
+                      >
+                        + Create New
+                      </button>
+                    </div>
+
+                    <div style={{ display: "flex", "flex-direction": "column", gap: "8px" }}>
+                      <For each={settingsStore.recentWorkspaces}>
+                        {(ws) => (
+                          <div 
+                            onClick={() => handleLaunchRecent(ws)}
+                            class="recent-workspace-card"
+                            style={{
+                              background: "rgba(255,255,255,0.03)",
+                              border: "1px solid var(--border-main)",
+                              "border-radius": "8px",
+                              padding: "12px 16px",
+                              display: "flex",
+                              "align-items": "center",
+                              gap: "16px",
+                              cursor: isLaunchingRecent() === ws.id ? "default" : "pointer",
+                              transition: "all 0.2s ease",
+                              position: "relative",
+                              overflow: "hidden",
+                              opacity: isLaunchingRecent() && isLaunchingRecent() !== ws.id ? 0.5 : 1
+                            }}
+                          >
+                            <div style={{ 
+                              width: "32px", 
+                              height: "32px", 
+                              "border-radius": "6px", 
+                              background: "rgba(255,255,255,0.05)", 
+                              display: "flex", 
+                              "align-items": "center", 
+                              "justify-content": "center",
+                              color: "var(--accent-primary)"
+                            }}>
+                              <Show when={isLaunchingRecent() === ws.id} fallback={<span>{ws.name[0].toUpperCase()}</span>}>
+                                <div class="spinner-small" />
+                              </Show>
+                            </div>
+                            <div style={{ flex: 1, "min-width": 0 }}>
+                              <div style={{ "font-weight": "500", "font-size": "13px", color: "var(--text-main)", "margin-bottom": "2px" }}>{ws.name}</div>
+                              <div style={{ "font-size": "11px", color: "var(--text-muted)", "white-space": "nowrap", "overflow": "hidden", "text-overflow": "ellipsis" }}>{ws.cwd}</div>
+                            </div>
+                            <div style={{ "text-align": "right", "flex-shrink": 0 }}>
+                              <div style={{ "font-size": "10px", color: "var(--text-muted)", "margin-bottom": "4px" }}>{ws.items.length} Agents</div>
+                              <div style={{ display: "flex", gap: "4px", "justify-content": "flex-end" }}>
+                                <For each={Array.from(new Set(ws.items)).slice(0, 3)}>
+                                  {(item) => (
+                                    <div style={{ width: "4px", height: "4px", "border-radius": "50%", background: "var(--accent-primary)", opacity: 0.5 }} />
+                                  )}
+                                </For>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); removeRecentWorkspace(ws.id); }}
+                              style={{ 
+                                position: "absolute", 
+                                right: "8px", 
+                                top: "8px", 
+                                background: "transparent", 
+                                border: "none", 
+                                color: "var(--text-muted)", 
+                                cursor: "pointer", 
+                                opacity: 0,
+                                transition: "opacity 0.2s"
+                              }}
+                              class="remove-recent-btn"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        )}
+                      </For>
+                      
+                      <Show when={settingsStore.recentWorkspaces.length === 0}>
+                        <div 
+                          onClick={() => setIsLauncherOpen(true)}
+                          style={{
+                            border: "1px dashed var(--border-main)",
+                            "border-radius": "8px",
+                            padding: "2rem",
+                            display: "flex",
+                            "flex-direction": "column",
+                            "align-items": "center",
+                            gap: "12px",
+                            cursor: "pointer",
+                            color: "var(--text-muted)",
+                            transition: "all 0.2s ease"
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.borderColor = "var(--accent-primary)"}
+                          onMouseLeave={(e) => e.currentTarget.style.borderColor = "var(--border-main)"}
+                        >
+                          <span style={{ "font-size": "12px" }}>No recent workspaces found.</span>
+                          <span style={{ "font-size": "11px", background: "rgba(255,255,255,0.05)", padding: "4px 12px", "border-radius": "12px" }}>Create your first workspace</span>
+                        </div>
+                      </Show>
+                    </div>
+                  </div>
+
+                  <div style={{ "margin-top": "4rem", display: "flex", gap: "2rem", opacity: 0.4 }}>
+                    <div style={{ display: "flex", "flex-direction": "column", "align-items": "center", gap: "8px" }}>
+                      <span style={{ "font-size": "10px", "font-weight": "bold" }}>CTRL + N</span>
+                      <span style={{ "font-size": "9px" }}>NEW WORKSPACE</span>
+                    </div>
+                    <div style={{ display: "flex", "flex-direction": "column", "align-items": "center", gap: "8px" }}>
+                      <span style={{ "font-size": "10px", "font-weight": "bold" }}>CTRL + ,</span>
+                      <span style={{ "font-size": "9px" }}>SETTINGS</span>
+                    </div>
+                    <div style={{ display: "flex", "flex-direction": "column", "align-items": "center", gap: "8px" }}>
+                      <span style={{ "font-size": "10px", "font-weight": "bold" }}>ESC</span>
+                      <span style={{ "font-size": "9px" }}>CLOSE MODAL</span>
+                    </div>
+                  </div>
                 </div>
               </Show>
 
@@ -263,7 +413,7 @@ function App() {
                     </div>
                   </div>
                   <div style={{ height: "1px", background: "var(--border-main)", margin: "8px 4px 6px 4px" }} />
-                  <div class="context-menu-item danger" onClick={() => { removeWorkspace(contextMenu()!.id); setContextMenu(null); }}><span>🗑</span> Close Workspace</div>
+                  <div class="context-menu-item danger" onClick={() => { closeWorkspace(contextMenu()!.id); setContextMenu(null); }}><span>🗑</span> Close Workspace</div>
                 </div>
               </Show>
             </section>
@@ -289,7 +439,14 @@ function App() {
         <ServerManager />
       </Show>
       <Show when={isLauncherOpen()}>
-        <LauncherModal isOpen={true} onClose={() => setIsLauncherOpen(false)} />
+        <LauncherModal 
+          isOpen={true} 
+          onClose={() => {
+            setIsLauncherOpen(false);
+            setLauncherTargetWorkspaceId(null);
+          }} 
+          targetWorkspaceId={launcherTargetWorkspaceId()}
+        />
       </Show>
       <SettingsPage isActive={isSettingsOpen()} onClose={() => setIsSettingsOpen(false)} />
     </div>
