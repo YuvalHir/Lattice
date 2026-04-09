@@ -26,19 +26,19 @@ A workspace that always fits your viewport. Terminals are perfectly adjacent wit
 ### 🔄 Workspace History & Relaunch
 Launch a previous workspace from history — no need to reconfigure. Your recent sessions are saved and one-click away.
 
-![Workspace History](docs/gifs/workspacehistory.webp)
+![Workspace History](docs/gifs/workspacehistory.gif)
 
 ### ✂️ Terminal Splitting & Add
 Split any terminal session directly from the tile header, or add new agents to your existing workspace on the fly.
 
-![Terminal Splitting](docs/gifs/agentsplit.webp)
+![Terminal Splitting](docs/gifs/agentsplit.gif)
 
 ### 🎨 6 Built-in Themes
 Choose from professional color palettes: **GitHub Dark**, **Dracula**, **Monokai**, **Nord**, **One Dark**, and **GitHub Light**. Themes apply to the entire UI and all terminal sessions.
 
 ![Theme Selector](docs/screenshots/themes.webp)
 
-![Theme Switching](docs/gifs/themeswitch.webp)
+![Theme Switching](docs/gifs/themeswitch.gif)
 
 ### 🛡️ ESC Key Everywhere
 Close any modal, dialog, or panel with a single `Escape` press. Works across launcher, settings, server manager, and more.
@@ -48,7 +48,7 @@ A multi-step onboarding experience to configure mixed session layouts (Gemini, C
 
 ![Swarm Launcher](docs/screenshots/swarmlauncher.webp)
 
-![Launch Workspace](docs/gifs/launchworkspace.webp)
+![Launch Workspace](docs/gifs/launchworkspace.gif)
 
 ### 📡 Server Management
 Automatically discover background services, view clean logs (ANSI-stripped), rename processes, and manage lifecycles from a dedicated panel.
