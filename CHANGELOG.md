@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] - 2026-04-09
+
+### Fixed
+- **Version References**: Corrected all version references to 0.1.7 across configuration files.
+
+### Changed
+- **CI/CD**: Simplified release workflow and fixed permissions for release creation.
+
+## [0.1.6] - 2026-04-04
+
+### Added
+- **Application Theme System**: 6 built-in themes (GitHub Dark, Dracula, Monokai, Nord, One Dark, GitHub Light) with live preview in settings.
+- **Workspace History**: Save and relaunch previous workspace configurations from recent history.
+- **Terminal Splitting**: Split terminals within a workspace and add multiple terminals per session.
+- **ESC Key Support**: Close modals and dialogs with Escape key across all components.
+
+### Fixed
+- **Process Cleanup**: Robust verification that WSL agent processes are properly terminated when closing workspaces.
+
 ## [0.1.5] - 2026-04-03
 
 ### Fixed
@@ -57,6 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.1.7]: https://github.com/YuvalHir/Lattice/releases/tag/v0.1.7
+[0.1.6]: https://github.com/YuvalHir/Lattice/releases/tag/v0.1.6
 [0.1.5]: https://github.com/YuvalHir/Lattice/releases/tag/v0.1.5
 [0.1.4]: https://github.com/YuvalHir/Lattice/releases/tag/v0.1.4
 [0.1.3]: https://github.com/YuvalHir/Lattice/releases/tag/v0.1.3
