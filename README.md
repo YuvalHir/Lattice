@@ -1,12 +1,15 @@
 # <img src="src/assets/logo.svg" width="48" height="48" valign="middle"> Lattice
 
 [![Version](https://img.shields.io/github/v/release/YuvalHir/Lattice?include_prereleases&logo=github)](https://github.com/YuvalHir/Lattice/releases)
+[![Website](https://img.shields.io/badge/Website-Online-brightgreen?logo=vercel)](https://yuvalhir.github.io/lattice-website/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-FFC131?logo=tauri&logoColor=white)](https://tauri.app/)
 [![Rust](https://img.shields.io/badge/Rust-1.75+-black?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![SolidJS](https://img.shields.io/badge/SolidJS-v1.9-2c4f7c?logo=solid&logoColor=white)](https://www.solidjs.com/)
 
 **Lattice** is a high-performance, zero-latency multiplexed orchestration environment designed for parallel AI agent swarms. Built with a Rust-powered backend and a reactive SolidJS frontend, it provides a "Zero-Scroll" workspace where terminals are perfectly tiled and synchronized.
+
+🌐 **Live Website:** [https://yuvalhir.github.io/lattice-website/](https://yuvalhir.github.io/lattice-website/)
 
 ![Lattice Workspace](docs/screenshots/workspace.webp)
 
