@@ -38,13 +38,71 @@ jobs:
       - name: install frontend dependencies
         run: npm install
 
-      - name: Build Changelog
+      - name: Generate Changelog
         id: build_changelog
-        uses: mikepenz/release-changelog-builder-action@v4
+        uses: actions/github-script@v7
         with:
-          configuration: ".github/changelog-config.json"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const currentTag = context.ref.replace('refs/tags/', '');
+            const previousTag = `v${process.env.PREVIOUS_VERSION || '0.1.6'}`;
+
+            const { data: comparison } = await github.rest.repos.compareCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              base: previousTag,
+              head: currentTag,
+            });
+
+            const conventionalCommits = {
+              feat: [],
+              fix: [],
+              perf: [],
+              refactor: [],
+              docs: [],
+              ci: [],
+              style: [],
+              chore: [],
+              other: [],
+            };
+
+            for (const commit of comparison.commits) {
+              const message = commit.commit.message.split('\n')[0];
+              const match = message.match(/^(feat|fix|perf|refactor|docs|ci|style|chore)(\([^)]+\))?:\s*(.*)/);
+              if (match) {
+                const [, type, , desc] = match;
+                conventionalCommits[type].push({ message, sha: commit.sha.substring(0, 7) });
+              } else {
+                conventionalCommits.other.push({ message, sha: commit.sha.substring(0, 7) });
+              }
+            }
+
+            const sections = [];
+
+            const categoryMap = {
+              feat: '🚀 Features',
+              fix: '🐛 Fixes',
+              perf: '⚡ Performance',
+              refactor: '🧱 Refactors',
+              docs: '📖 Documentation',
+              ci: '⚙️ CI/CD',
+              style: '🎨 Style & Themes',
+              chore: '📦 Dependencies',
+              other: '📝 Other Changes',
+            };
+
+            for (const [type, title] of Object.entries(categoryMap)) {
+              const items = conventionalCommits[type];
+              if (items.length > 0) {
+                const lines = items.map(c => `- ${c.message} (${c.sha})`).join('\n');
+                sections.push(`### ${title}\n\n${lines}`);
+              }
+            }
+
+            const changelog = sections.length > 0
+              ? sections.join('\n\n')
+              : 'No changes detected.';
+
+            core.setOutput('changelog', changelog);
 
       - uses: tauri-apps/tauri-action@v0.6.2
         env:
@@ -54,7 +112,6 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Lattice ${{ github.ref_name }}"
-          releaseBody: ${{steps.build_changelog.outputs.changelog}}
+          releaseBody: ${{ steps.build_changelog.outputs.changelog }}
           releaseDraft: false
           prerelease: false
-
