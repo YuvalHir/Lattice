@@ -25,6 +25,10 @@
       "labels": ["ci", "build"]
     },
     {
+      "title": "🎨 Style & Themes",
+      "labels": ["style", "theme"]
+    },
+    {
       "title": "🧪 Tests",
       "labels": ["test"]
     },
@@ -38,10 +42,13 @@
   ],
   "template": "${{CHANGELOG}}\n\n<details>\n<summary><b>Full Commit History</b></summary>\n\n${{COMMITS}}\n</details>",
   "empty_template": "## All Changes\n${{COMMITS}}",
+  "commit_template": "- ${{TITLE}} (${{HASH}})",
+  "commit_template_without_pr": "- ${{TITLE}} (${{HASH}})",
+  "pr_template": "- ${{TITLE}} (#${{NUMBER}})",
   "ignore_no_label": false,
   "label_extractor": [
     {
-      "pattern": "^(feat|feature|fix|bug|refactor|docs|doc|test|chore|dependencies|style|ci|build|perf)(\\(.*\\))?:.*",
+      "pattern": "^(feat|feature|fix|bug|refactor|docs|doc|test|chore|dependencies|style|theme|ci|build|perf)(\\(.*\\))?:.*",
       "target": "$1"
     }
   ]

@@ -3,7 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 
 import { sessionStore, setActiveWorkspace, updateWorkspaceColor, renameWorkspace, WORKSPACE_COLORS, toggleServerManager } from "./store/sessionStore";
-import { settingsStore, addRecentWorkspace, removeRecentWorkspace } from "./store/settingsStore";
+import { settingsStore, addRecentWorkspace, removeRecentWorkspace, applyTheme } from "./store/settingsStore";
 import { launchWorkspace, closeWorkspace, type WorkspaceLaunchItem } from "./services/ipc";
 import { Sidebar } from "./components/Sidebar";
 import { RightSidebar } from "./components/RightSidebar";
@@ -34,6 +34,9 @@ function App() {
   };
 
   onMount(() => {
+    // Initialize theme on app startup
+    applyTheme(settingsStore.theme);
+
     // RAM Polling
     const interval = setInterval(async () => {
       const activeWorkspace = sessionStore.workspaces.find(w => w.id === sessionStore.activeWorkspaceId);

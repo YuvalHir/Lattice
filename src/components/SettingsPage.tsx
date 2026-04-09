@@ -5,13 +5,16 @@ import {
   resetSettings,
   settingsStore,
   updateSettings,
+  THEMES,
+  applyTheme,
   type AppSettings,
   type SessionType,
+  type ThemeId,
 } from "../store/settingsStore";
 import { checkForUpdates } from "../init";
 import { getVersion } from "@tauri-apps/api/app";
 
-type SettingsCategory = "common" | "terminal" | "sessions" | "shortcuts" | "about";
+type SettingsCategory = "common" | "appearance" | "terminal" | "sessions" | "shortcuts" | "about";
 
 interface SettingsPageProps {
   isActive: boolean;
@@ -20,6 +23,7 @@ interface SettingsPageProps {
 
 const SETTINGS_CATEGORIES: { id: SettingsCategory; label: string; icon: string }[] = [
   { id: "common", label: "Common", icon: "⚙" },
+  { id: "appearance", label: "Appearance", icon: "◑" },
   { id: "terminal", label: "Terminal", icon: "▮" },
   { id: "sessions", label: "Sessions", icon: "◫" },
   { id: "shortcuts", label: "Keyboard Shortcuts", icon: "⌨" },
@@ -104,6 +108,66 @@ export const SettingsPage = (props: SettingsPageProps) => {
             onInput={(e) => setDraft((prev) => ({ ...prev, defaultBrowserUrl: e.currentTarget.value }))}
             placeholder="http://localhost:3000"
           />
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderAppearanceSettings = () => (
+    <div class="settings-category-content">
+      <div class="settings-section">
+        <h3 class="settings-section-title">Theme</h3>
+        <p class="settings-section-description">Choose a theme for the application and terminals</p>
+
+        <div class="settings-theme-grid">
+          <For each={THEMES}>
+            {(theme) => (
+              <div
+                classList={{
+                  "settings-theme-card": true,
+                  active: draft().theme === theme.id,
+                }}
+                onClick={() => {
+                  setDraft((prev) => ({ ...prev, theme: theme.id }));
+                  applyTheme(theme.id);
+                }}
+              >
+                <div class="settings-theme-preview">
+                  <div class="settings-theme-preview-header" style={{ background: theme.colors.bgHeader }}>
+                    <div class="settings-theme-dot" style={{ background: theme.colors.accentDanger }} />
+                    <div class="settings-theme-dot" style={{ background: theme.colors.accentSecondary }} />
+                    <div class="settings-theme-dot" style={{ background: theme.colors.accentPrimary }} />
+                  </div>
+                  <div class="settings-theme-preview-body" style={{ background: theme.colors.bgApp }}>
+                    <div class="settings-theme-sidebar" style={{ background: theme.colors.bgSidebar }}>
+                      <div class="settings-theme-sidebar-icon" style={{ background: theme.colors.textMuted }} />
+                      <div class="settings-theme-sidebar-icon" style={{ background: theme.colors.textMuted }} />
+                      <div class="settings-theme-sidebar-icon" style={{ background: theme.colors.textMuted }} />
+                    </div>
+                    <div class="settings-theme-preview-content">
+                      <div class="settings-theme-line" style={{ background: theme.colors.borderMain }} />
+                      <div class="settings-theme-line short" style={{ background: theme.colors.textMuted }} />
+                      <div class="settings-theme-line" style={{ background: theme.colors.borderMain }} />
+                      <div class="settings-theme-line medium" style={{ background: theme.colors.accentPrimary }} />
+                      <div class="settings-theme-line" style={{ background: theme.colors.borderMain }} />
+                      <div class="settings-theme-line short" style={{ background: theme.colors.textMain }} />
+                    </div>
+                  </div>
+                </div>
+                <div class="settings-theme-info">
+                  <div class="settings-theme-name">{theme.name}</div>
+                  <div class="settings-theme-desc">{theme.description}</div>
+                </div>
+                <Show when={draft().theme === theme.id}>
+                  <div class="settings-theme-check">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </div>
+                </Show>
+              </div>
+            )}
+          </For>
         </div>
       </div>
     </div>
@@ -353,6 +417,7 @@ export const SettingsPage = (props: SettingsPageProps) => {
       {/* Settings Content */}
       <main class="settings-main">
         <Show when={activeCategory() === "common"}>{renderCommonSettings()}</Show>
+        <Show when={activeCategory() === "appearance"}>{renderAppearanceSettings()}</Show>
         <Show when={activeCategory() === "terminal"}>{renderTerminalSettings()}</Show>
         <Show when={activeCategory() === "sessions"}>{renderSessionsSettings()}</Show>
         <Show when={activeCategory() === "shortcuts"}>{renderShortcutsSettings()}</Show>

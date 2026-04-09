@@ -4,7 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import { sessionStore } from "../store/sessionStore";
-import { settingsStore } from "../store/settingsStore";
+import { settingsStore, getCurrentTheme } from "../store/settingsStore";
 import { writeToStdin, resizeTerminal } from "../services/ipc";
 
 /**
@@ -85,31 +85,34 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
       return;
     }
 
+    const currentTheme = getCurrentTheme();
+    const tc = currentTheme.colors;
+
     term = new Terminal({
       cursorBlink: true,
       fontSize: settingsStore.terminalFontSize,
       fontFamily: "'JetBrains Mono', monospace",
       theme: {
-        background: "#0B0F1A",
-        foreground: "#E0E7FF", // --text-main
-        cursor: "#00E5FF", // --accent-primary
-        selectionBackground: "rgba(0, 229, 255, 0.3)",
-        black: "#0B0F1A",
-        red: "#FF5555",
-        green: "#50FA7B",
-        yellow: "#F1FA8C",
-        blue: "#BD93F9",
-        magenta: "#FF79C6",
-        cyan: "#8BE9FD",
-        white: "#F8F8F2",
-        brightBlack: "#44475A",
-        brightRed: "#FF6E6E",
-        brightGreen: "#69FF94",
-        brightYellow: "#FFFFA5",
-        brightBlue: "#D6ACFF",
-        brightMagenta: "#FF92DF",
-        brightCyan: "#A4FFFF",
-        brightWhite: "#FFFFFF"
+        background: tc.terminalBg,
+        foreground: tc.terminalFg,
+        cursor: tc.terminalCursor,
+        selectionBackground: tc.terminalSelection,
+        black: tc.terminalBlack,
+        red: tc.terminalRed,
+        green: tc.terminalGreen,
+        yellow: tc.terminalYellow,
+        blue: tc.terminalBlue,
+        magenta: tc.terminalMagenta,
+        cyan: tc.terminalCyan,
+        white: tc.terminalWhite,
+        brightBlack: tc.terminalBrightBlack,
+        brightRed: tc.terminalBrightRed,
+        brightGreen: tc.terminalBrightGreen,
+        brightYellow: tc.terminalBrightYellow,
+        brightBlue: tc.terminalBrightBlue,
+        brightMagenta: tc.terminalBrightMagenta,
+        brightCyan: tc.terminalBrightCyan,
+        brightWhite: tc.terminalBrightWhite,
       },
       allowProposedApi: true,
     });

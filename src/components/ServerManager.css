@@ -15,8 +15,8 @@
 .server-manager-content {
   width: 90%;
   height: 85%;
-  background: #0C0C0C;
-  border: 1px solid #333;
+  background: var(--bg-app);
+  border: 1px solid var(--border-main);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -29,20 +29,20 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #222;
-  background: #111;
+  border-bottom: 1px solid var(--border-main);
+  background: var(--bg-header);
 }
 
 .header-title h2 {
   margin: 0;
   font-size: 1.6rem;
-  color: #00E5FF;
+  color: var(--accent-primary);
   letter-spacing: 0.5px;
 }
 
 .service-count {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--text-muted);
   font-family: 'Cascadia Code', monospace;
 }
 
@@ -73,7 +73,7 @@
 .close-btn {
   background: transparent;
   border: none;
-  color: #666;
+  color: var(--text-muted);
   font-size: 1.8rem;
   cursor: pointer;
   padding: 0;
@@ -81,7 +81,7 @@
 }
 
 .close-btn:hover {
-  color: #fff;
+  color: var(--text-main);
 }
 
 .services-list {
@@ -93,18 +93,18 @@
 table {
   width: 100%;
   border-collapse: collapse;
-  color: #ccc;
+  color: var(--text-main);
   font-family: 'Cascadia Code', monospace;
 }
 
 thead th {
   position: sticky;
   top: 0;
-  background: #111;
+  background: var(--bg-header);
   text-align: left;
   padding: 1.2rem 1.5rem;
-  border-bottom: 2px solid #222;
-  color: #555;
+  border-bottom: 2px solid var(--border-main);
+  color: var(--text-muted);
   text-transform: uppercase;
   font-size: 0.7rem;
   letter-spacing: 1.5px;
@@ -112,7 +112,7 @@ thead th {
 }
 
 tbody tr {
-  border-bottom: 1px solid #1a1a1a;
+  border-bottom: 1px solid var(--border-main);
   transition: background 0.1s;
 }
 
@@ -133,7 +133,7 @@ tbody td {
 
 .name-text {
   font-weight: 600;
-  color: #eee;
+  color: var(--text-main);
   font-size: 0.95rem;
 }
 
@@ -146,12 +146,12 @@ tbody td {
 
 .name-display-wrapper:hover .name-text {
   text-decoration: underline;
-  color: #00E5FF;
+  color: var(--accent-primary);
 }
 
 .edit-icon {
   opacity: 0;
-  color: #666;
+  color: var(--text-muted);
   transition: opacity 0.2s;
 }
 
@@ -160,25 +160,24 @@ tbody td {
 }
 
 .rename-input {
-  background: #000;
-  border: 1px solid #00E5FF;
-  color: #fff;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--accent-primary);
+  color: var(--text-main);
   padding: 2px 6px;
   border-radius: 4px;
   font-family: 'Cascadia Code', monospace;
   font-size: 0.9rem;
-  width: 180px;
 }
 
 .indicator {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #222;
+  background: var(--border-main);
 }
 
 .indicator.active {
-  background: #50FA7B;
+  background: var(--terminal-green, #50fa7b);
   box-shadow: 0 0 10px rgba(80, 250, 123, 0.4);
 }
 
@@ -191,15 +190,15 @@ tbody td {
 }
 
 .tag.external {
-  background: #222;
-  color: #666;
-  border: 1px solid #333;
+  background: var(--bg-sidebar);
+  color: var(--text-muted);
+  border: 1px solid var(--border-main);
 }
 
 .tag.managed {
-  background: rgba(0, 229, 255, 0.1);
-  color: #00E5FF;
-  border: 1px solid rgba(0, 229, 255, 0.2);
+  background: rgba(88, 166, 255, 0.1);
+  color: var(--accent-primary);
+  border: 1px solid rgba(88, 166, 255, 0.2);
 }
 
 .port-chips {
@@ -209,27 +208,27 @@ tbody td {
 }
 
 .port-link {
-  color: #00E5FF;
+  color: var(--accent-primary);
   text-decoration: none;
-  background: rgba(0, 229, 255, 0.1);
+  background: rgba(88, 166, 255, 0.1);
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 0.85rem;
-  border: 1px solid rgba(0, 229, 255, 0.2);
+  border: 1px solid rgba(88, 166, 255, 0.2);
 }
 
 .port-link:hover {
-  background: rgba(0, 229, 255, 0.2);
-  border-color: #00E5FF;
+  background: rgba(88, 166, 255, 0.2);
+  border-color: var(--accent-primary);
 }
 
 .no-ports {
-  color: #444;
+  color: var(--text-muted);
   font-size: 0.8rem;
 }
 
 .pid-code {
-  color: #BD93F9;
+  color: var(--terminal-magenta, #bd93f9);
   background: rgba(189, 147, 249, 0.1);
   padding: 2px 6px;
   border-radius: 4px;
@@ -238,11 +237,11 @@ tbody td {
 .status-badge {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #555;
+  color: var(--text-muted);
 }
 
 .status-badge.listening {
-  color: #50FA7B;
+  color: var(--terminal-green, #50fa7b);
 }
 
 .path-cell {
@@ -254,7 +253,7 @@ tbody td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #555;
+  color: var(--text-muted);
   font-size: 0.8rem;
 }
 
@@ -270,30 +269,30 @@ tbody td {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1a1a1a;
-  border: 1px solid #333;
-  color: #666;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-main);
+  color: var(--text-muted);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .action-btn:hover {
-  color: #fff;
-  border-color: #555;
-  background: #222;
+  color: var(--text-main);
+  border-color: var(--border-active);
+  background: var(--bg-header);
 }
 
 .action-btn.stop:hover {
-  background: rgba(255, 85, 85, 0.15);
-  color: #FF5555;
-  border-color: #FF5555;
+  background: rgba(248, 81, 73, 0.15);
+  color: var(--accent-danger);
+  border-color: var(--accent-danger);
 }
 
 .action-btn.restart:hover {
   background: rgba(80, 250, 123, 0.1);
-  color: #50FA7B;
-  border-color: #50FA7B;
+  color: var(--terminal-green, #50fa7b);
+  border-color: var(--terminal-green, #50fa7b);
 }
 
 /* Modal Styling */
@@ -312,18 +311,18 @@ tbody td {
 }
 
 .launch-modal-content {
-  background: #111;
+  background: var(--bg-header);
   width: 450px;
   padding: 2rem;
   border-radius: 12px;
-  border: 1px solid #333;
+  border: 1px solid var(--border-main);
   box-shadow: 0 20px 60px rgba(0,0,0,0.8);
 }
 
 .launch-modal-content h3 {
   margin-top: 0;
   margin-bottom: 1.5rem;
-  color: #fff;
+  color: var(--text-main);
 }
 
 .form-group {
@@ -333,7 +332,7 @@ tbody td {
 .form-group label {
   display: block;
   font-size: 0.75rem;
-  color: #666;
+  color: var(--text-muted);
   text-transform: uppercase;
   margin-bottom: 0.5rem;
   letter-spacing: 1px;
@@ -341,9 +340,9 @@ tbody td {
 
 .form-group input {
   width: 100%;
-  background: #000;
-  border: 1px solid #222;
-  color: #fff;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-main);
+  color: var(--text-main);
   padding: 0.75rem;
   border-radius: 6px;
   font-family: 'Cascadia Code', monospace;
@@ -352,7 +351,7 @@ tbody td {
 
 .form-group input:focus {
   outline: none;
-  border-color: #00E5FF;
+  border-color: var(--accent-primary);
 }
 
 .dir-input {
@@ -361,9 +360,9 @@ tbody td {
 }
 
 .dir-input button {
-  background: #222;
-  color: #ccc;
-  border: 1px solid #333;
+  background: var(--bg-sidebar);
+  color: var(--text-main);
+  border: 1px solid var(--border-main);
   padding: 0 1rem;
   border-radius: 6px;
   cursor: pointer;
@@ -378,15 +377,15 @@ tbody td {
 
 .btn-cancel {
   background: transparent;
-  color: #666;
+  color: var(--text-muted);
   border: none;
   cursor: pointer;
   padding: 0.5rem 1rem;
 }
 
 .btn-deploy {
-  background: #00E5FF;
-  color: #000;
+  background: var(--accent-primary);
+  color: var(--bg-app);
   border: none;
   padding: 0.6rem 1.5rem;
   border-radius: 6px;
@@ -402,14 +401,14 @@ tbody td {
 .shell-input-wrapper {
   display: flex;
   align-items: center;
-  background: #000;
-  border: 1px solid #222;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-main);
   border-radius: 6px;
   padding: 0 0.75rem;
 }
 
 .shell-prompt {
-  color: #50FA7B;
+  color: var(--terminal-green, #50fa7b);
   font-family: 'Cascadia Code', monospace;
   margin-right: 0.5rem;
   font-weight: bold;
@@ -423,17 +422,17 @@ tbody td {
 .hint {
   display: block;
   font-size: 0.65rem;
-  color: #444;
+  color: var(--text-muted);
   margin-top: 0.4rem;
   font-family: 'Cascadia Code', monospace;
 }
 
 .hint.error-text {
-  color: #FF5555;
+  color: var(--accent-danger);
 }
 
 .shell-input-wrapper.error-shake {
-  border-color: #FF5555 !important;
+  border-color: var(--accent-danger) !important;
   animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
 }
 
@@ -460,10 +459,10 @@ tbody td {
 }
 
 .log-viewer-content {
-  background: #000;
+  background: var(--bg-sidebar);
   width: 90%;
   height: 80%;
-  border: 1px solid #333;
+  border: 1px solid var(--border-main);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -476,14 +475,14 @@ tbody td {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #111;
-  border-bottom: 1px solid #222;
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-main);
 }
 
 .log-viewer-header h3 {
   margin: 0;
   font-size: 1rem;
-  color: #50FA7B;
+  color: var(--terminal-green, #50fa7b);
   font-family: 'Cascadia Code', monospace;
 }
 
@@ -492,17 +491,17 @@ tbody td {
   padding: 1.5rem;
   margin: 0;
   overflow-y: auto;
-  color: #eee;
+  color: var(--text-main);
   font-family: 'Cascadia Code', monospace;
   font-size: 0.85rem;
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-all;
-  background: #050505;
+  background: var(--bg-app);
 }
 
 .action-btn.logs:hover {
-  background: rgba(0, 229, 255, 0.1);
-  color: #00E5FF;
-  border-color: #00E5FF;
+  background: rgba(88, 166, 255, 0.1);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
 }

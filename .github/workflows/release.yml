@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Necessary for changelog generation
+          fetch-depth: 0
 
       - name: setup node
         uses: actions/setup-node@v4
@@ -52,8 +52,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__
-          releaseName: "Lattice v__VERSION__"
+          tagName: ${{ github.ref_name }}
+          releaseName: "Lattice ${{ github.ref_name }}"
           releaseBody: ${{steps.build_changelog.outputs.changelog}}
           releaseDraft: false
           prerelease: false
