@@ -134,8 +134,10 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
       enableWebglIfNeeded();
     }
 
+    // Bolt ⚡: Reuse TextEncoder instance to prevent unnecessary garbage collection and allocations on every keystroke
+    const textEncoder = new TextEncoder();
     const dataListener = term.onData((data) => {
-      const bytes = Array.from(new TextEncoder().encode(data));
+      const bytes = Array.from(textEncoder.encode(data));
       writeToStdin(props.id, bytes).catch(console.error);
       scheduleViewportRecover(40);
     });
