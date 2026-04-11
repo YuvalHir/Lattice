@@ -18,8 +18,6 @@ export interface WorkspaceSession {
   isBackground?: boolean;
 }
 
-const MAX_BUFFER_SIZE = 50000; // Limit buffer to ~50KB to prevent memory leaks
-
 export interface WorkspaceInstance {
   id: string;
   name: string;
