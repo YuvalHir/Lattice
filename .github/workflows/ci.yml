@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-22.04, windows-latest, macos-latest]
+        platform: [ubuntu-latest, windows-latest, macos-latest]
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -25,6 +25,11 @@ jobs:
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
 
       - name: install dependencies (ubuntu only)
         if: runner.os == 'Linux'
@@ -64,7 +69,7 @@ jobs:
           pkg-config --debug --modversion gdk-3.0
 
       - name: install frontend dependencies
-        run: npm install
+        run: npm install --prefer-offline
 
       - name: typecheck frontend
         run: npx tsc --noEmit
