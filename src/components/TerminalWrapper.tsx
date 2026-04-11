@@ -31,12 +31,19 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
 
   const syncTerminalSize = () => {
     if (!fitAddon || !term) return;
-    fitAddon.fit();
-    const { rows, cols } = term;
-    if (rows !== lastRows || cols !== lastCols) {
-      lastRows = rows;
-      lastCols = cols;
-      resizeTerminal(props.id, rows, cols).catch(() => {});
+    try {
+      fitAddon.fit();
+      const { rows, cols } = term;
+      // Guard against nonsensical dimensions during transition/hidden states
+      if (rows <= 0 || cols <= 0) return;
+      
+      if (rows !== lastRows || cols !== lastCols) {
+        lastRows = rows;
+        lastCols = cols;
+        resizeTerminal(props.id, rows, cols).catch(() => {});
+      }
+    } catch (e) {
+      // Fit can sometimes fail if element is not in DOM or hidden
     }
   };
 
@@ -44,7 +51,12 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
     if (!term) return;
     syncTerminalSize();
     term.refresh(0, Math.max(0, term.rows - 1));
-    term.scrollToBottom();
+    
+    // Only scroll to bottom if we were already there
+    const buffer = term.buffer.active;
+    if (buffer.viewportY === buffer.baseY) {
+      term.scrollToBottom();
+    }
   };
 
   const enableWebglIfNeeded = () => {
@@ -225,8 +237,18 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
       // Catch up once when switching back from an inactive workspace.
       if (props.isActive && !wasActive && lastWrittenIndex < session.buffer.length) {
         const missed = session.buffer.slice(lastWrittenIndex);
-        term.write(missed);
-        term.scrollToBottom();
+        
+        // Determine if we should scroll to bottom after writing
+        const buffer = term.buffer.active;
+        const wasAtBottom = buffer.viewportY === buffer.baseY;
+
+        // Write each chunk sequentially to the terminal
+        missed.forEach(chunk => term?.write(chunk));
+        
+        if (wasAtBottom) {
+          term.scrollToBottom();
+        }
+        
         lastWrittenIndex = session.buffer.length;
       } else if (props.isActive) {
         // Active terminals are streamed live via init.ts direct-pipe path.

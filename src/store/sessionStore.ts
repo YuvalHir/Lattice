@@ -12,7 +12,7 @@ export interface WorkspaceSession {
   isDead: boolean;
   exitCode: number | null;
   startedAt: string;
-  buffer: string; // Changed to string for performance
+  buffer: string[]; // List of chunks for better memory handling
   browserUrl?: string;
   customName?: string; // User-defined name override
   isBackground?: boolean;
@@ -145,7 +145,7 @@ export function addSession(id: string, pid: number, preset: LauncherPreset, isBa
     isDead: false,
     exitCode: null,
     startedAt: new Date().toISOString(),
-    buffer: '',
+    buffer: [],
     isBackground,
   });
   if (!isBackground) {
@@ -178,7 +178,7 @@ export function addBrowserSession(id: string, url: string, name = 'Browser') {
     isDead: false,
     exitCode: null,
     startedAt: new Date().toISOString(),
-    buffer: '',
+    buffer: [],
     browserUrl: url,
     isBackground: false,
   });
@@ -209,11 +209,12 @@ export function terminateSession(id: string, exitCode: number | null = null) {
 }
 
 /**
- * Utility to strip ANSI escape codes from a string for safe display in non-terminal UIs.
+ * Utility to strip ANSI escape codes from a string or array of strings for safe display in non-terminal UIs.
  */
-export function stripAnsi(text: string): string {
+export function stripAnsi(text: string | string[]): string {
+  const combined = Array.isArray(text) ? text.join('') : text;
   // Common ANSI escape sequence regex
-  return text.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+  return combined.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 }
 
 /**
@@ -221,11 +222,15 @@ export function stripAnsi(text: string): string {
  */
 export function appendOutput(id: string, data: string) {
   setStore('sessions', id, 'buffer', (prev) => {
-    const combined = prev + data;
-    if (combined.length > MAX_BUFFER_SIZE) {
-      return combined.slice(-MAX_BUFFER_SIZE);
+    // We add a new chunk to the list of strings to avoid huge string concatenations.
+    const newBuffer = [...prev, data];
+    
+    // Safety: keep last 500 chunks (~100-200KB of output)
+    if (newBuffer.length > 500) {
+      return newBuffer.slice(-400);
     }
-    return combined;
+    
+    return newBuffer;
   });
 }
 

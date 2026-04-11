@@ -161,7 +161,11 @@ const ServerManager: Component = () => {
   const activeLogBuffer = () => {
     const id = viewingLogId();
     if (!id) return '';
-    const raw = sessionStore.sessions[id]?.buffer || 'No logs available yet...';
+    const session = sessionStore.sessions[id];
+    if (!session || !session.buffer || session.buffer.length === 0) return 'No logs available yet...';
+    
+    // Join chunks for display
+    const raw = session.buffer.join('');
     return stripAnsi(raw);
   };
 
