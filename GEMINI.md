@@ -35,6 +35,10 @@ Lattice is a high-performance, zero-latency multiplexed orchestration environmen
 - **Capability Model**: All new features requiring OS access MUST be explicitly defined in `src-tauri/capabilities/default.json`.
 - **Process Management**: Always use `taskkill` (Windows) or `kill -9` (Unix) to ensure swarm-wide cleanup when "Terminate All" is invoked.
 
+## 📦 Release Hygiene
+- **Changelog Mandate**: Before pushing any version tag (e.g., `v*`), the `CHANGELOG.md` MUST be updated with the latest changes, adhering to the established format.
+- **CI/CD Alignment**: All performance optimizations and dependency fixes applied to the CI environment MUST be reflected in the `release.yml` to ensure build parity.
+
 ## 📝 Change Logs & Logging
 - **Deep Logging**: All PTY lifecycle events (Spawn, Read, Emit, Resize, Exit) MUST be printed to the Rust console with the `[WORKSPACE]` or `[PTY]` prefix.
 - **Frontend Debugging**: IPC events and mounting sequences MUST be logged to the browser console with the `[IPC]` or `[TerminalWrapper]` prefix.

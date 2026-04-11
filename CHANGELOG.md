@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2026-04-11
+
+### Added
+- **Native Clipboard Support**: Implemented `Ctrl+V` (Paste) and `Ctrl+C` (Copy) within terminal tiles for a seamless "native" experience.
+
+### Changed
+- **Performance (Agent Spawning)**: Optimized Linux agent loading by removing login shell overhead (`-lc` -> `-c`), significantly reducing startup latency.
+- **Performance (Terminal)**: Optimized the terminal input pipeline using binary `Uint8Array` to bypass expensive object conversions and improved layout recovery pulses.
+- **Backend (Resource Monitoring)**: Integrated a persistent `sysinfo` System object in the backend to optimize RAM and service discovery polling, reducing CPU spikes.
+- **CI/CD**: Implemented Rust and NPM caching in GitHub Actions to drastically reduce build times.
+- **CI/CD**: Unified CI and Release workflows to use `ubuntu-latest` and robust GDK detection for Linux builds.
+
+### Fixed
+- **CI/CD (Linux)**: Resolved `gdk-sys` compilation errors on Ubuntu by correctly configuring `pkg-config` paths and adding missing development headers.
+- **CI/CD (macOS)**: Fixed macOS release failures by removing mandatory Apple signing requirements for non-developer account builds.
+
 ## [0.1.7] - 2026-04-09
 
 ### Fixed
@@ -76,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.1.8]: https://github.com/YuvalHir/Lattice/releases/tag/v0.1.8
 [0.1.7]: https://github.com/YuvalHir/Lattice/releases/tag/v0.1.7
 [0.1.6]: https://github.com/YuvalHir/Lattice/releases/tag/v0.1.6
 [0.1.5]: https://github.com/YuvalHir/Lattice/releases/tag/v0.1.5
