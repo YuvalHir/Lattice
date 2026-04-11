@@ -1,3 +1,10 @@
+## [0.1.9](https://github.com/YuvalHir/Lattice/compare/v0.1.8...v0.1.9) (2026-04-11)
+
+
+### Bug Fixes
+
+* update release rules to trigger on chore and perf commits ([c1c0d84](https://github.com/YuvalHir/Lattice/commit/c1c0d84159ca701a8bb9d8052cab9e6a3c9fda89))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
