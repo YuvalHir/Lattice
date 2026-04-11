@@ -17,6 +17,8 @@ jobs:
         platform: [macos-latest, ubuntu-latest, windows-latest]
 
     runs-on: ${{ matrix.platform }}
+    env:
+      PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,12 +46,22 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libsoup-3.0-dev \
             libxdo-dev \
             libcairo2-dev \
             libpango1.0-dev \
             libgdk-pixbuf2.0-dev \
+            libglib2.0-dev \
             patchelf \
             pkg-config
+
+      - name: diagnostic (ubuntu only)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          echo "Checking for gdk-3.0.pc..."
+          find /usr -name gdk-3.0.pc
+          pkg-config --modversion gdk-3.0 || echo "pkg-config failed to find gdk-3.0"
 
       - name: install frontend dependencies
         run: npm install
@@ -65,7 +77,6 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Lattice ${{ github.ref_name }}"
