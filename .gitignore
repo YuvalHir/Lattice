@@ -27,11 +27,16 @@ dist-ssr/
 *.local
 .vite/
 .output/
+latest.json
 
 # Tauri/Rust
 src-tauri/target/
 src-tauri/gen/
 src-tauri/capabilities/*.debug.json
+src-tauri/Cargo.lock
+
+# Lockfiles (optional but recommended for rapid automated release environments)
+package-lock.json
 
 # Environment variables
 .env
