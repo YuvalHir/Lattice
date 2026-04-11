@@ -12,6 +12,11 @@ import { writeToStdin, resizeTerminal } from "../services/ipc";
  */
 export const terminalRegistry = new Map<string, Terminal>();
 
+/**
+ * Global registry for scroll positions to persist across tab switches and remounts.
+ */
+const scrollRegistry = new Map<string, { lastWasAtBottom: boolean, savedViewportY: number }>();
+
 interface TerminalWrapperProps {
   id: string; 
   isActive: boolean;
@@ -28,34 +33,45 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
   let wasActive = false;
   let viewportRecoverTimer: number | undefined;
   let resizeObserver: ResizeObserver | undefined;
+  let isRestoringScroll = false;
+
+  const getScrollState = () => {
+    return scrollRegistry.get(props.id) || { lastWasAtBottom: true, savedViewportY: 0 };
+  };
+
+  const setScrollState = (state: { lastWasAtBottom: boolean, savedViewportY: number }) => {
+    scrollRegistry.set(props.id, state);
+  };
 
   const syncTerminalSize = () => {
-    if (!fitAddon || !term) return;
+    if (!fitAddon || !term || !props.isActive) return;
     try {
       fitAddon.fit();
       const { rows, cols } = term;
-      // Guard against nonsensical dimensions during transition/hidden states
       if (rows <= 0 || cols <= 0) return;
       
       if (rows !== lastRows || cols !== lastCols) {
         lastRows = rows;
         lastCols = cols;
+        console.log(`[TerminalWrapper] Resizing ${props.id} to ${cols}x${rows}`);
         resizeTerminal(props.id, rows, cols).catch(() => {});
       }
-    } catch (e) {
-      // Fit can sometimes fail if element is not in DOM or hidden
-    }
+    } catch (e) {}
   };
 
-  const recoverViewport = () => {
-    if (!term) return;
+  const recoverViewport = (forceBottom = false) => {
+    if (!term || !props.isActive) return;
     syncTerminalSize();
     term.refresh(0, Math.max(0, term.rows - 1));
     
-    // Only scroll to bottom if we were already there
-    const buffer = term.buffer.active;
-    if (buffer.viewportY === buffer.baseY) {
+    const state = getScrollState();
+    if (forceBottom || state.lastWasAtBottom) {
       term.scrollToBottom();
+    } else {
+      isRestoringScroll = true;
+      term.scrollToLine(state.savedViewportY);
+      // Release lock after a short delay to allow xterm.js to settle
+      setTimeout(() => { isRestoringScroll = false; }, 100);
     }
   };
 
@@ -169,6 +185,19 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
       writeToStdin(props.id, bytes).catch(console.error);
     });
 
+    const scrollListener = term.onScroll(() => {
+      if (!term || !props.isActive || isRestoringScroll) return;
+      
+      const buffer = term.buffer.active;
+      // If the terminal is hidden, ignore scroll events as they are often 'resets' to 0
+      if (!terminalElement || terminalElement.offsetHeight === 0) return;
+
+      setScrollState({
+        lastWasAtBottom: buffer.viewportY >= buffer.baseY - 1,
+        savedViewportY: buffer.viewportY
+      });
+    });
+
     const handleWindowFocus = () => scheduleViewportRecover(30);
     const handleWindowResize = () => scheduleViewportRecover(30);
     const handleForcedReflow = () => {
@@ -190,6 +219,7 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
       resizeObserver?.disconnect();
       disableWebglIfNeeded();
       dataListener.dispose();
+      scrollListener.dispose();
       terminalRegistry.delete(props.id);
       term?.dispose();
     });
@@ -206,9 +236,40 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
     }
   });
 
+  // Activation Effect: Runs when props.isActive changes
   createEffect(() => {
-    if (props.isActive && fitAddon && term) {
+    if (!term) return;
+
+    if (props.isActive) {
       enableWebglIfNeeded();
+
+      // Catch up once when switching back from an inactive workspace.
+      const session = sessionStore.sessions[props.id];
+      if (!wasActive && session && lastWrittenIndex < session.buffer.length) {
+        const missed = session.buffer.slice(lastWrittenIndex);
+        lastWrittenIndex = session.buffer.length;
+
+        const writeAndRestore = () => {
+          const state = getScrollState();
+          if (state.lastWasAtBottom) {
+            term?.scrollToBottom();
+          } else {
+            isRestoringScroll = true;
+            term?.scrollToLine(state.savedViewportY);
+            setTimeout(() => { isRestoringScroll = false; }, 100);
+          }
+        };
+
+        if (missed.length > 0) {
+          const lastChunk = missed.pop()!;
+          missed.forEach(chunk => term?.write(chunk));
+          // Use callback of the last chunk to ensure buffer is ready before scrolling
+          term.write(lastChunk, writeAndRestore);
+        } else {
+          writeAndRestore();
+        }
+      }
+
       // Reduced delay pass: only two pulses to stabilize layout
       const recoverDelays = [10, 150];
       recoverDelays.forEach((delay) =>
@@ -219,44 +280,37 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
           } catch (e) {}
         }, delay)
       );
+
       setTimeout(() => {
         try {
-          // Signal all mounted terminals to run a synchronized reflow pass.
           window.dispatchEvent(new Event("terminal-force-reflow"));
         } catch (e) {}
       }, 20);
-    } else if (!props.isActive) {
-      // Release GPU contexts for hidden tabs to avoid browser context limits.
+
+      wasActive = true;
+    } else {
+      // Deactivating - capture current state before hiding if it was actually active and visible
+      if (wasActive && term && terminalElement && terminalElement.offsetHeight > 0) {
+        const buffer = term.buffer.active;
+        setScrollState({
+          lastWasAtBottom: buffer.viewportY >= buffer.baseY - 1,
+          savedViewportY: buffer.viewportY
+        });
+      }
+
       disableWebglIfNeeded();
+      wasActive = false;
     }
   });
 
+  // Index Tracking Effect: Keeps background buffer in sync
   createEffect(() => {
     const session = sessionStore.sessions[props.id];
-    if (session && term) {
-      // Catch up once when switching back from an inactive workspace.
-      if (props.isActive && !wasActive && lastWrittenIndex < session.buffer.length) {
-        const missed = session.buffer.slice(lastWrittenIndex);
-        
-        // Determine if we should scroll to bottom after writing
-        const buffer = term.buffer.active;
-        const wasAtBottom = buffer.viewportY === buffer.baseY;
-
-        // Write each chunk sequentially to the terminal
-        missed.forEach(chunk => term?.write(chunk));
-        
-        if (wasAtBottom) {
-          term.scrollToBottom();
-        }
-        
-        lastWrittenIndex = session.buffer.length;
-      } else if (props.isActive) {
-        // Active terminals are streamed live via init.ts direct-pipe path.
-        // Here we only keep index in sync to avoid duplicate rendering.
-        lastWrittenIndex = session.buffer.length;
-      }
+    if (session && term && props.isActive) {
+      // Active terminals are streamed live via init.ts direct-pipe path.
+      // Here we only keep index in sync to avoid duplicate rendering.
+      lastWrittenIndex = session.buffer.length;
     }
-    wasActive = props.isActive;
   });
 
   return (
