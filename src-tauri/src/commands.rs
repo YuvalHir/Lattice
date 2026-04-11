@@ -230,11 +230,11 @@ pub async fn spawn_process(
     let app_emitter = app.clone();
     let session_id_emitter = session_id.clone();
     let spoof_tx_clone = spoof_tx.clone();
-    
+
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(20));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-        
+
         let mut byte_buffer = Vec::with_capacity(16384);
 
         loop {
@@ -479,6 +479,15 @@ pub async fn get_all_services(
 
     let mut port_map: std::collections::HashMap<u32, Vec<u16>> = std::collections::HashMap::new();
 
+    // Build parent-child mapping once for efficient descendant lookups
+    let mut children_map: std::collections::HashMap<Pid, Vec<Pid>> =
+        std::collections::HashMap::new();
+    for (&pid, process) in sys.processes() {
+        if let Some(parent) = process.parent() {
+            children_map.entry(parent).or_default().push(pid);
+        }
+    }
+
     // 1. Get Listening Ports
     #[cfg(windows)]
     {
@@ -562,28 +571,33 @@ pub async fn get_all_services(
         seen_pids.insert(root_pid);
 
         // Find ALL descendants of this managed process to prevent duplicate "External" entries
-        let mut tree_pids = vec![root_pid];
         let mut ports = port_map.get(&root_pid).cloned().unwrap_or_default();
+        let mut queue = vec![Pid::from_u32(root_pid)];
+        let mut visited = std::collections::HashSet::new();
+        visited.insert(Pid::from_u32(root_pid));
 
-        // One pass over all processes to find children and their ports
-        for (&proc_pid, _) in sys.processes() {
-            if is_descendant(&sys, proc_pid, Pid::from_u32(root_pid)) {
-                let proc_pid_u32 = proc_pid.to_string().parse::<u32>().unwrap_or(0);
-                tree_pids.push(proc_pid_u32);
-                seen_pids.insert(proc_pid_u32);
-                if let Some(p) = port_map.get(&proc_pid_u32) {
-                    ports.extend(p);
+        while let Some(pid) = queue.pop() {
+            if let Some(children) = children_map.get(&pid) {
+                for &child in children {
+                    if visited.insert(child) {
+                        queue.push(child);
+                        let child_u32 = child.to_string().parse::<u32>().unwrap_or(0);
+                        seen_pids.insert(child_u32);
+                        if let Some(p) = port_map.get(&child_u32) {
+                            ports.extend(p);
+                        }
+                    }
                 }
             }
         }
-        
-        // Filter out ephemeral ports (>32768) if we have other ports, 
+
+        // Filter out ephemeral ports (>32768) if we have other ports,
         // as they are usually internal IPC/debug ports.
         let mut significant_ports: Vec<u16> = ports.iter().cloned().filter(|&p| p < 32768).collect();
         if significant_ports.is_empty() {
             significant_ports = ports;
         }
-        
+
         significant_ports.sort();
         significant_ports.dedup();
 
@@ -612,10 +626,10 @@ pub async fn get_all_services(
         if let Some(proc) = sys.process(sys_pid) {
             let exe_path = proc.exe().map(|p| p.to_string_lossy().to_lowercase()).unwrap_or_default();
             let proc_name = proc.name().to_string_lossy().to_lowercase();
-            
-            let is_node = proc_name.contains("node") || 
-                          proc_name.contains("npm") || 
-                          proc_name.contains("yarn") || 
+
+            let is_node = proc_name.contains("node") ||
+                          proc_name.contains("npm") ||
+                          proc_name.contains("yarn") ||
                           proc_name.contains("pnpm") ||
                           exe_path.contains("node") ||
                           exe_path.contains("nvm");
@@ -644,20 +658,6 @@ pub async fn get_all_services(
     Ok(services)
 }
 
-fn is_descendant(sys: &System, pid: Pid, root: Pid) -> bool {
-    let mut current = pid;
-    while let Some(proc) = sys.process(current) {
-        if let Some(parent) = proc.parent() {
-            if parent == root {
-                return true;
-            }
-            current = parent;
-        } else {
-            break;
-        }
-    }
-    false
-}
 
 #[tauri::command]
 pub async fn get_git_info(cwd: String) -> Result<GitInfo, String> {
