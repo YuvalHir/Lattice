@@ -2,13 +2,45 @@ name: "Release"
 
 on:
   push:
-    tags:
-      - "v*"
-  workflow_dispatch:
+    branches:
+      - main
+      - master
 
 jobs:
+  versioning:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+    outputs:
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
+      new_release_version: ${{ steps.semantic.outputs.new_release_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: install dependencies
+        run: npm install
+
+      - name: release
+        id: semantic
+        uses: cycjimmy/semantic-release-action@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # Build on all platforms and upload artifacts
   build:
+    needs: versioning
+    if: needs.versioning.outputs.new_release_published == 'true'
     permissions:
       contents: write
     strategy:
@@ -17,10 +49,14 @@ jobs:
         platform: [macos-latest, ubuntu-latest, windows-latest]
 
     runs-on: ${{ matrix.platform }}
+    env:
+      PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # We must checkout the newly created tag or the commit that semantic-release just pushed
+          ref: v${{ needs.versioning.outputs.new_release_version }}
 
       - name: setup node
         uses: actions/setup-node@v4
@@ -98,8 +134,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Lattice ${{ github.ref_name }}"
+          tagName: v${{ needs.versioning.outputs.new_release_version }}
+          releaseName: "Lattice v${{ needs.versioning.outputs.new_release_version }}"
           generateReleaseNotes: true
           releaseDraft: false
           prerelease: false
