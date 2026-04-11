@@ -45,6 +45,9 @@ jobs:
             librsvg2-dev \
             libwebkit2gtk-4.1-dev \
             libxdo-dev \
+            libcairo2-dev \
+            libpango1.0-dev \
+            libgdk-pixbuf2.0-dev \
             patchelf \
             pkg-config
 
@@ -62,7 +65,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig
+          PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Lattice ${{ github.ref_name }}"
