@@ -1,3 +1,12 @@
+## [0.1.12](https://github.com/YuvalHir/Lattice/compare/v0.1.11...v0.1.12) (2026-04-11)
+
+
+### Bug Fixes
+
+* **ci:** remove node cache as package-lock.json is ignored ([aa0570d](https://github.com/YuvalHir/Lattice/commit/aa0570de1be287f947c8ef26cf959af36124302d))
+* ensure tauri build uses updated version from semantic-release tag ([76354f7](https://github.com/YuvalHir/Lattice/commit/76354f77cd80504d47362106c9daa197078ff735))
+* sync tauri.conf.json version and automate updates in semantic-release ([89827b4](https://github.com/YuvalHir/Lattice/commit/89827b4b6a7588a054183f91d520dc2af72fdcf6))
+
 ## [0.1.11](https://github.com/YuvalHir/Lattice/compare/v0.1.10...v0.1.11) (2026-04-11)
 
 
