@@ -14,11 +14,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
+        platform: [macos-latest, ubuntu-22.04, windows-latest]
 
     runs-on: ${{ matrix.platform }}
-    env:
-      PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,7 +31,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-latest'
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -57,11 +55,28 @@ jobs:
             pkg-config
 
       - name: diagnostic (ubuntu only)
-        if: matrix.platform == 'ubuntu-latest'
+        if: runner.os == 'Linux'
+        env:
+          PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
+          PKG_CONFIG_PATH_x86_64_unknown_linux_gnu: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
+          PKG_CONFIG_LIBDIR_x86_64_unknown_linux_gnu: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
+          PKG_CONFIG_ALLOW_SYSTEM_CFLAGS: "1"
+          PKG_CONFIG_ALLOW_SYSTEM_LIBS: "1"
         run: |
           echo "Checking for gdk-3.0.pc..."
           find /usr -name gdk-3.0.pc
-          pkg-config --modversion gdk-3.0 || echo "pkg-config failed to find gdk-3.0"
+          pkg-config --debug --modversion gdk-3.0
+
+      - name: rust preflight (ubuntu only)
+        if: runner.os == 'Linux'
+        working-directory: src-tauri
+        env:
+          PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
+          PKG_CONFIG_PATH_x86_64_unknown_linux_gnu: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
+          PKG_CONFIG_LIBDIR_x86_64_unknown_linux_gnu: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
+          PKG_CONFIG_ALLOW_SYSTEM_CFLAGS: "1"
+          PKG_CONFIG_ALLOW_SYSTEM_LIBS: "1"
+        run: cargo check
 
       - name: install frontend dependencies
         run: npm install
@@ -69,6 +84,11 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
+          PKG_CONFIG_PATH_x86_64_unknown_linux_gnu: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
+          PKG_CONFIG_LIBDIR_x86_64_unknown_linux_gnu: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
+          PKG_CONFIG_ALLOW_SYSTEM_CFLAGS: "1"
+          PKG_CONFIG_ALLOW_SYSTEM_LIBS: "1"
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
