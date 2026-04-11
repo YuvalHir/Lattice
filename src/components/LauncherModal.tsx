@@ -609,10 +609,9 @@ export const LauncherModal = (props: LauncherModalProps) => {
                 }
               >
                 <button 
-                  class="btn-primary" 
+                  class="btn-success" 
                   disabled={totalSessions() === 0 || isLaunching()} 
                   onClick={handleLaunch}
-                  style={{ background: "#238636" }}
                 >
                   {isLaunching() ? "Launching..." : `Deploy Swarm`}
                 </button>

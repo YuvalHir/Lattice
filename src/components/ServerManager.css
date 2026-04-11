@@ -53,21 +53,22 @@
 }
 
 .launch-btn {
-  background: #238636;
-  color: #fff;
+  background: var(--accent-success);
+  color: var(--bg-app);
   border: none;
   padding: 0.6rem 1.2rem;
   border-radius: 6px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
   font-size: 0.9rem;
-  transition: background 0.2s;
+  transition: all 0.2s;
 }
 
 .launch-btn:hover {
-  background: #2ea043;
+  filter: brightness(1.1);
+  transform: translateY(-1px);
 }
 
 .close-btn {
@@ -177,7 +178,7 @@ tbody td {
 }
 
 .indicator.active {
-  background: var(--terminal-green, #50fa7b);
+  background: var(--accent-success);
   box-shadow: 0 0 10px rgba(80, 250, 123, 0.4);
 }
 
@@ -228,7 +229,7 @@ tbody td {
 }
 
 .pid-code {
-  color: var(--terminal-magenta, #bd93f9);
+  color: var(--terminal-magenta);
   background: rgba(189, 147, 249, 0.1);
   padding: 2px 6px;
   border-radius: 4px;
@@ -241,7 +242,7 @@ tbody td {
 }
 
 .status-badge.listening {
-  color: var(--terminal-green, #50fa7b);
+  color: var(--accent-success);
 }
 
 .path-cell {
@@ -291,8 +292,8 @@ tbody td {
 
 .action-btn.restart:hover {
   background: rgba(80, 250, 123, 0.1);
-  color: var(--terminal-green, #50fa7b);
-  border-color: var(--terminal-green, #50fa7b);
+  color: var(--accent-success);
+  border-color: var(--accent-success);
 }
 
 /* Modal Styling */
@@ -384,13 +385,17 @@ tbody td {
 }
 
 .btn-deploy {
-  background: var(--accent-primary);
+  background: var(--accent-success);
   color: var(--bg-app);
   border: none;
   padding: 0.6rem 1.5rem;
   border-radius: 6px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.btn-deploy:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
 
 .btn-deploy:disabled {
@@ -408,7 +413,7 @@ tbody td {
 }
 
 .shell-prompt {
-  color: var(--terminal-green, #50fa7b);
+  color: var(--accent-success);
   font-family: 'Cascadia Code', monospace;
   margin-right: 0.5rem;
   font-weight: bold;
@@ -482,7 +487,7 @@ tbody td {
 .log-viewer-header h3 {
   margin: 0;
   font-size: 1rem;
-  color: var(--terminal-green, #50fa7b);
+  color: var(--accent-success);
   font-family: 'Cascadia Code', monospace;
 }
 

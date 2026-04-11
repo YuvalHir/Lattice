@@ -446,8 +446,22 @@ export function applyTheme(themeId: ThemeId) {
   root.style.setProperty('--accent-primary', colors.accentPrimary);
   root.style.setProperty('--accent-secondary', colors.accentSecondary);
   root.style.setProperty('--accent-danger', colors.accentDanger);
+  root.style.setProperty('--accent-success', colors.terminalGreen);
+  root.style.setProperty('--accent-warning', colors.terminalYellow);
+  root.style.setProperty('--accent-info', colors.terminalBlue);
+  root.style.setProperty('--accent-magenta', colors.terminalMagenta);
   root.style.setProperty('--text-main', colors.textMain);
   root.style.setProperty('--text-muted', colors.textMuted);
+
+  // Terminal basic colors
+  root.style.setProperty('--terminal-black', colors.terminalBlack);
+  root.style.setProperty('--terminal-red', colors.terminalRed);
+  root.style.setProperty('--terminal-green', colors.terminalGreen);
+  root.style.setProperty('--terminal-yellow', colors.terminalYellow);
+  root.style.setProperty('--terminal-blue', colors.terminalBlue);
+  root.style.setProperty('--terminal-magenta', colors.terminalMagenta);
+  root.style.setProperty('--terminal-cyan', colors.terminalCyan);
+  root.style.setProperty('--terminal-white', colors.terminalWhite);
 
   // Update the settings store
   updateSettings({ ...store, theme: themeId });

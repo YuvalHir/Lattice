@@ -12,6 +12,7 @@
   --accent-primary: #58a6ff; /* Professional Blue */
   --accent-secondary: #8b949e;
   --accent-danger: #f85149;
+  --accent-success: #7ee787;
 
   --text-main: #c9d1d9;
   --text-muted: #8b949e;
@@ -561,6 +562,31 @@ body {
   box-shadow: 0 4px 12px rgba(88, 166, 255, 0.3);
 }
 
+.btn-success {
+  background: var(--accent-success);
+  color: var(--bg-app);
+  border: none;
+  padding: 0.7rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-success:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(126, 231, 135, 0.3);
+}
+
+.btn-success:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .btn-secondary {
   background: transparent;
   color: var(--text-muted);
@@ -889,20 +915,19 @@ body {
 }
 
 .settings-save-btn {
-  background: #238636;
-  border: 1px solid #238636;
-  color: #ffffff;
+  background: var(--accent-success);
+  border: 1px solid var(--accent-success);
+  color: var(--bg-app);
   padding: 8px 16px;
   border-radius: 6px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .settings-save-btn:hover {
-  background: #2ea043;
-  border-color: #2ea043;
+  filter: brightness(1.1);
 }
 
 /* Settings Main Content */
