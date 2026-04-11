@@ -462,6 +462,7 @@ pub struct ServiceInfo {
     pub session_id: Option<String>,
 }
 
+#[cfg(windows)]
 #[derive(Debug, Serialize, Deserialize)]
 struct PortOwner {
     #[serde(rename = "LocalPort")]

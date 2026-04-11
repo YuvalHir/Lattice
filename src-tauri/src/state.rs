@@ -38,6 +38,12 @@ pub struct SessionRegistry {
 
 impl SessionRegistry {
     pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for SessionRegistry {
+    fn default() -> Self {
         Self {
             sessions: HashMap::new(),
             sys: sysinfo::System::new_all(),

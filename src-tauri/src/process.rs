@@ -2,6 +2,7 @@ use crate::state::ExecutionContext;
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtyPair, PtySize};
 use std::env;
 use std::error::Error;
+#[cfg(windows)]
 use std::path::Path;
 
 /// Resolves common Windows shell names to their absolute system paths.
@@ -157,7 +158,7 @@ pub fn spawn_with_pty(
     builder.cwd(final_cwd);
 
     // 7. Spawn on PTY Slave
-    let child = pair.slave.spawn_command(builder).map_err(|e| e)?;
+    let child = pair.slave.spawn_command(builder)?;
 
     Ok((pair, child))
 }
