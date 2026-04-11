@@ -55,7 +55,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # We must checkout the newly created tag or the commit that semantic-release just pushed
+          # Ensure we are on the exact tag created by the versioning job
           ref: v${{ needs.versioning.outputs.new_release_version }}
 
       - name: setup node
@@ -95,30 +95,6 @@ jobs:
             libglib2.0-dev \
             patchelf \
             pkg-config
-
-      - name: diagnostic (ubuntu only)
-        if: runner.os == 'Linux'
-        env:
-          PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
-          PKG_CONFIG_PATH_x86_64_unknown_linux_gnu: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
-          PKG_CONFIG_LIBDIR_x86_64_unknown_linux_gnu: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
-          PKG_CONFIG_ALLOW_SYSTEM_CFLAGS: "1"
-          PKG_CONFIG_ALLOW_SYSTEM_LIBS: "1"
-        run: |
-          echo "Checking for gdk-3.0.pc..."
-          find /usr -name gdk-3.0.pc
-          pkg-config --debug --modversion gdk-3.0
-
-      - name: rust preflight (ubuntu only)
-        if: runner.os == 'Linux'
-        working-directory: src-tauri
-        env:
-          PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
-          PKG_CONFIG_PATH_x86_64_unknown_linux_gnu: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
-          PKG_CONFIG_LIBDIR_x86_64_unknown_linux_gnu: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
-          PKG_CONFIG_ALLOW_SYSTEM_CFLAGS: "1"
-          PKG_CONFIG_ALLOW_SYSTEM_LIBS: "1"
-        run: cargo check
 
       - name: install frontend dependencies
         run: npm install --prefer-offline
