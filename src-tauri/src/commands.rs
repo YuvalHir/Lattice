@@ -423,8 +423,62 @@ pub async fn kill_process(
 }
 
 #[tauri::command]
-pub async fn kill_pid(pid: u32) -> Result<(), String> {
+pub async fn kill_pid(
+    state: State<'_, Arc<Mutex<SessionRegistry>>>,
+    pid: u32,
+) -> Result<(), String> {
     println!("[BACKEND] kill_pid pid={}", pid);
+
+    let mut sys = System::new();
+    sys.refresh_processes(ProcessesToUpdate::All, true);
+
+    let mut is_authorized = false;
+
+    // 1. Check if it's a managed session
+    {
+        let registry = state.lock().await;
+        if registry.sessions.values().any(|s| s.pid == pid) {
+            is_authorized = true;
+        }
+    }
+
+    // 2. Check if it's a descendant of Lattice
+    if !is_authorized {
+        let lattice_pid = Pid::from_u32(std::process::id());
+        if is_descendant(&sys, Pid::from_u32(pid), lattice_pid) {
+            is_authorized = true;
+        }
+    }
+
+    // 3. Check if it's a Node-related process with listening ports
+    // This allows Terminating external Node services discovered by get_all_services
+    if !is_authorized {
+        if let Some(proc) = sys.process(Pid::from_u32(pid)) {
+            let exe_path = proc
+                .exe()
+                .map(|p| p.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+            let proc_name = proc.name().to_string_lossy().to_lowercase();
+
+            let is_node = proc_name.contains("node")
+                || proc_name.contains("npm")
+                || proc_name.contains("yarn")
+                || proc_name.contains("pnpm")
+                || exe_path.contains("node")
+                || exe_path.contains("nvm");
+
+            if is_node {
+                let port_map = get_listening_ports().await?;
+                if port_map.contains_key(&pid) {
+                    is_authorized = true;
+                }
+            }
+        }
+    }
+
+    if !is_authorized {
+        return Err("Unauthorized: PID is not managed by Lattice".to_string());
+    }
 
     #[cfg(windows)]
     {
@@ -474,79 +528,10 @@ struct PortOwner {
 pub async fn get_all_services(
     state: State<'_, Arc<Mutex<SessionRegistry>>>,
 ) -> Result<Vec<ServiceInfo>, String> {
-    let mut sys = System::new_all();
-    sys.refresh_all();
+    let mut sys = System::new();
+    sys.refresh_processes(ProcessesToUpdate::All, true);
 
-    let mut port_map: std::collections::HashMap<u32, Vec<u16>> = std::collections::HashMap::new();
-
-    // 1. Get Listening Ports
-    #[cfg(windows)]
-    {
-        let output = tokio::process::Command::new("powershell")
-            .args([
-                "-NoProfile",
-                "-Command",
-                "Get-NetTCPConnection -State Listen | Select-Object LocalPort, OwningProcess | ConvertTo-Json",
-            ])
-            .no_window()
-            .output()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            if !stdout.trim().is_empty() {
-                if let Ok(owners) = serde_json::from_str::<Vec<PortOwner>>(&stdout) {
-                    for owner in owners {
-                        port_map
-                            .entry(owner.owning_process)
-                            .or_default()
-                            .push(owner.local_port);
-                    }
-                } else if let Ok(owner) = serde_json::from_str::<PortOwner>(&stdout) {
-                    port_map
-                        .entry(owner.owning_process)
-                        .or_default()
-                        .push(owner.local_port);
-                }
-            }
-        }
-    }
-
-    #[cfg(not(windows))]
-    {
-        let output = tokio::process::Command::new("ss")
-            .args(["-tunlp"])
-            .no_window()
-            .output()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            for line in stdout.lines().skip(1) {
-                if let Some(pid_start) = line.find("pid=") {
-                    let pid_str: String = line[pid_start + 4..]
-                        .chars()
-                        .take_while(|c| c.is_ascii_digit())
-                        .collect();
-                    if let Ok(pid) = pid_str.parse::<u32>() {
-                        if let Some(addr_start) = line.rfind(" ") {
-                            let part = &line[..addr_start].trim();
-                            if let Some(last_space) = part.rfind(" ") {
-                                let addr = &part[last_space + 1..];
-                                if let Some(port_start) = addr.rfind(":") {
-                                    if let Ok(port) = addr[port_start + 1..].parse::<u16>() {
-                                        port_map.entry(pid).or_default().push(port);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    let port_map = get_listening_ports().await?;
 
     let registry = state.lock().await;
     let mut services = Vec::new();
@@ -914,6 +899,80 @@ pub async fn get_memory_usage(workspace_pids: Vec<u32>) -> Result<MemoryUsage, S
         workspace_bytes,
         total_bytes,
     })
+}
+
+async fn get_listening_ports() -> Result<std::collections::HashMap<u32, Vec<u16>>, String> {
+    let mut port_map: std::collections::HashMap<u32, Vec<u16>> = std::collections::HashMap::new();
+
+    // 1. Get Listening Ports
+    #[cfg(windows)]
+    {
+        let output = tokio::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                "Get-NetTCPConnection -State Listen | Select-Object LocalPort, OwningProcess | ConvertTo-Json",
+            ])
+            .no_window()
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if !stdout.trim().is_empty() {
+                if let Ok(owners) = serde_json::from_str::<Vec<PortOwner>>(&stdout) {
+                    for owner in owners {
+                        port_map
+                            .entry(owner.owning_process)
+                            .or_default()
+                            .push(owner.local_port);
+                    }
+                } else if let Ok(owner) = serde_json::from_str::<PortOwner>(&stdout) {
+                    port_map
+                        .entry(owner.owning_process)
+                        .or_default()
+                        .push(owner.local_port);
+                }
+            }
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        let output = tokio::process::Command::new("ss")
+            .args(["-tunlp"])
+            .no_window()
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines().skip(1) {
+                if let Some(pid_start) = line.find("pid=") {
+                    let pid_str: String = line[pid_start + 4..]
+                        .chars()
+                        .take_while(|c| c.is_ascii_digit())
+                        .collect();
+                    if let Ok(pid) = pid_str.parse::<u32>() {
+                        if let Some(addr_start) = line.rfind(" ") {
+                            let part = &line[..addr_start].trim();
+                            if let Some(last_space) = part.rfind(" ") {
+                                let addr = &part[last_space + 1..];
+                                if let Some(port_start) = addr.rfind(":") {
+                                    if let Ok(port) = addr[port_start + 1..].parse::<u16>() {
+                                        port_map.entry(pid).or_default().push(port);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(port_map)
 }
 
 fn get_memory_recursive(
