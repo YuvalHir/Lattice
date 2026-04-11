@@ -24,13 +24,13 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "node -e \"const v='${nextRelease.version}'; const fs=require('fs'); ['src-tauri/Cargo.toml'].forEach(f => fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace(/version = \\\"[^\\\"]+\\\"/, 'version = \\\"' + v + '\\\"')))\""
+        "prepareCmd": "node -e \"const v='${nextRelease.version}'; const fs=require('fs'); ['src-tauri/Cargo.toml', 'src-tauri/tauri.conf.json'].forEach(f => { let c = fs.readFileSync(f, 'utf8'); if (f.endsWith('.toml')) c = c.replace(/version = \\\"[^\\\"]+\\\"/, 'version = \\\"' + v + '\\\"'); else c = c.replace(/\\\"version\\\": \\\"[^\\\"]+\\\"/, '\\\"version\\\": \\\"' + v + '\\\"'); fs.writeFileSync(f, c); })\""
       }
     ],
     [
       "@semantic-release/git",
       {
-        "assets": ["package.json", "package-lock.json", "CHANGELOG.md", "src-tauri/Cargo.toml"],
+        "assets": ["package.json", "package-lock.json", "CHANGELOG.md", "src-tauri/Cargo.toml", "src-tauri/tauri.conf.json"],
         "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }
     ],
