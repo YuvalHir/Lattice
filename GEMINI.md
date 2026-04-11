@@ -37,7 +37,7 @@ Lattice is a high-performance, zero-latency multiplexed orchestration environmen
 
 ## 📦 Release Hygiene
 - **Changelog Mandate**: Before pushing any version tag (e.g., `v*`), the `CHANGELOG.md` MUST be updated with the latest changes, adhering to the established format.
-- **Version Sync**: `package.json` and `src-tauri/Cargo.toml` MUST have identical version strings. Before tagging, both files must be bumped to the new version.
+- **Version Sync**: Versions are managed automatically by **Semantic Release**. Do not bump versions manually in `package.json` or `Cargo.toml`. The CI will analyze commit messages (`feat:`, `fix:`) to determine the next version and keep both files in sync.
 - **CI/CD Alignment**: All performance optimizations and dependency fixes applied to the CI environment MUST be reflected in the `release.yml` to ensure build parity.
 
 ## 📝 Change Logs & Logging
