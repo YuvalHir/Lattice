@@ -1,3 +1,10 @@
+## [0.1.11](https://github.com/YuvalHir/Lattice/compare/v0.1.10...v0.1.11) (2026-04-11)
+
+
+### Bug Fixes
+
+* integrate semantic-release and tauri-build into a single secure pipeline ([c585457](https://github.com/YuvalHir/Lattice/commit/c585457980b9f35407fd89d0a1f2b1f67c589db2))
+
 ## [0.1.10](https://github.com/YuvalHir/Lattice/compare/v0.1.9...v0.1.10) (2026-04-11)
 
 
