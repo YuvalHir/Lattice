@@ -9,7 +9,6 @@ import {
   applyTheme,
   type AppSettings,
   type SessionType,
-  type ThemeId,
 } from "../store/settingsStore";
 import { checkForUpdates } from "../init";
 import { getVersion } from "@tauri-apps/api/app";

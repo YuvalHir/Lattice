@@ -333,7 +333,7 @@ function App() {
                               <div style={{ "font-size": "10px", color: "var(--text-muted)", "margin-bottom": "4px" }}>{ws.items.length} Agents</div>
                               <div style={{ display: "flex", gap: "4px", "justify-content": "flex-end" }}>
                                 <For each={Array.from(new Set(ws.items)).slice(0, 3)}>
-                                  {(item) => (
+                                  {() => (
                                     <div style={{ width: "4px", height: "4px", "border-radius": "50%", background: "var(--accent-primary)", opacity: 0.5 }} />
                                   )}
                                 </For>

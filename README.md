@@ -1,5 +1,7 @@
 # <img src="src/assets/logo.svg" width="48" height="48" valign="middle"> Lattice
 
+[**🚀 Download Latest Release**](https://github.com/YuvalHir/Lattice/releases/latest)
+
 [![Version](https://img.shields.io/github/v/release/YuvalHir/Lattice?include_prereleases&logo=github)](https://github.com/YuvalHir/Lattice/releases)
 [![Website](https://img.shields.io/badge/Website-Online-brightgreen?logo=vercel)](https://yuvalhir.github.io/lattice-website/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -107,9 +109,31 @@ Themes apply to the entire application — UI, terminals, panels, and modals —
 ---
 
 ## 📥 Getting Started
-
 ### For Users (Download)
 Lattice is currently in early access (**v0.1.7**). Download the latest installers for Windows, macOS, and Linux from the [Releases](https://github.com/YuvalHir/Lattice/releases) section.
+
+#### 🍏 macOS Installation & Gatekeeper
+Since Lattice is an open-source project and not currently signed with an Apple Developer Certificate, macOS Gatekeeper will flag it as "unidentified" or "damaged."
+
+**To install on macOS:**
+1. Download the `.dmg` or `.app.tar.gz`.
+2. Move **Lattice.app** to your `/Applications` folder.
+3. **Right-click** (or Control-click) on Lattice in your Applications folder and select **Open**.
+4. A dialog will appear saying it's from an unidentified developer. Click **Open** again.
+
+**If you see "Lattice is damaged and can't be opened":**
+This is a common Gatekeeper issue for unsigned apps. You can fix it with this command:
+```bash
+# Remove quarantine flag
+xattr -cr /Applications/Lattice.app
+```
+
+Alternatively, you can run our fix script directly:
+```bash
+curl -fsSL https://raw.githubusercontent.com/YuvalHir/Lattice/main/scripts/macos-fix.sh | bash
+```
+
+---
 
 ### For Developers (Build from Source)
 

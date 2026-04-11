@@ -1,6 +1,6 @@
-import { createSignal, createEffect, For, Show, onMount } from "solid-js";
+import { createSignal, createEffect, For, Show } from "solid-js";
 import { sessionStore } from "../store/sessionStore";
-import { readDir, BaseDirectory } from "@tauri-apps/plugin-fs";
+import { readDir } from "@tauri-apps/plugin-fs";
 import { join } from "@tauri-apps/api/path";
 
 // Professional Icon Pack - Using VS and OC which are more stable
@@ -12,8 +12,6 @@ import {
   VsFilePdf, 
   VsFileMedia, 
   VsJson,
-  VsSymbolNamespace,
-  VsSettingsGear,
   VsMarkdown
 } from 'solid-icons/vs';
 import { 

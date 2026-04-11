@@ -238,9 +238,9 @@ export const LauncherModal = (props: LauncherModalProps) => {
       killProcess(id).catch(() => {});
       terminateSession(id, 0);
     }
-    setPreLaunched({ Gemini: [], Claude: [], Codex: [], OpenCode: [], WSL: [], Browser: [] });
-    setSpawningCounts({ Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0 });
-    setRetryAfterTs({ Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0 });
+    setPreLaunched({ Gemini: [], Claude: [], Codex: [], OpenCode: [], WSL: [], Browser: [], Terminal: [] });
+    setSpawningCounts({ Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0, Terminal: 0 });
+    setRetryAfterTs({ Gemini: 0, Claude: 0, Codex: 0, OpenCode: 0, WSL: 0, Browser: 0, Terminal: 0 });
   };
 
   onMount(() => {
@@ -308,7 +308,7 @@ export const LauncherModal = (props: LauncherModalProps) => {
       }
 
       // Neutralize preLaunched map as they are now "adopted"
-      setPreLaunched({ Gemini: [], Claude: [], Codex: [], OpenCode: [], WSL: [], Browser: [] });
+      setPreLaunched({ Gemini: [], Claude: [], Codex: [], OpenCode: [], WSL: [], Browser: [], Terminal: [] });
       props.onClose();
     } catch (e: any) {
       console.error("Launch failed:", e);
