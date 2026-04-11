@@ -1,3 +1,10 @@
+# [0.2.0](https://github.com/YuvalHir/Lattice/compare/v0.1.12...v0.2.0) (2026-04-11)
+
+
+### Features
+
+* add sidebar home navigation and quick-cd support in launcher ([c0a4be5](https://github.com/YuvalHir/Lattice/commit/c0a4be5888f98151f5d73ee928e9af29305f7a06))
+
 ## [0.1.12](https://github.com/YuvalHir/Lattice/compare/v0.1.11...v0.1.12) (2026-04-11)
 
 
