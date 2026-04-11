@@ -102,7 +102,6 @@ fn flush_buffer(
     app: &AppHandle,
     id: &str,
     byte_buffer: &mut Vec<u8>,
-    spoof_tx: &mpsc::Sender<Vec<u8>>,
 ) {
     if byte_buffer.is_empty() {
         return;
@@ -143,11 +142,6 @@ fn flush_buffer(
     };
 
     if !to_emit.is_empty() {
-        // TTY-Spoof: Respond to cursor position requests commonly used by shell tools
-        if to_emit.contains("\x1b[6n") {
-            let _ = spoof_tx.try_send(b"\x1b[1;1R".to_vec());
-        }
-
         let _ = app.emit(
             "terminal-output",
             TerminalOutputPayload {
@@ -208,7 +202,6 @@ pub async fn spawn_process(
 
     let (stdin_tx, mut stdin_rx) = mpsc::channel::<Vec<u8>>(1024);
     let (output_tx, mut output_rx) = mpsc::channel::<Vec<u8>>(1024);
-    let (spoof_tx, mut spoof_rx) = mpsc::channel::<Vec<u8>>(10);
 
     // 1. Dedicated Reader Thread (Low-latency blocking reads)
     std::thread::spawn(move || {
@@ -229,7 +222,6 @@ pub async fn spawn_process(
     // 2. Throttled Aggregator Task (Runs on Tokio)
     let app_emitter = app.clone();
     let session_id_emitter = session_id.clone();
-    let spoof_tx_clone = spoof_tx.clone();
 
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(20));
@@ -243,12 +235,12 @@ pub async fn spawn_process(
                     byte_buffer.extend(data);
                     // Force flush if buffer is getting huge to prevent extreme latency spikes
                     if byte_buffer.len() > 32768 {
-                        flush_buffer(&app_emitter, &session_id_emitter, &mut byte_buffer, &spoof_tx_clone);
+                        flush_buffer(&app_emitter, &session_id_emitter, &mut byte_buffer);
                     }
                 }
                 _ = interval.tick() => {
                     if !byte_buffer.is_empty() {
-                        flush_buffer(&app_emitter, &session_id_emitter, &mut byte_buffer, &spoof_tx_clone);
+                        flush_buffer(&app_emitter, &session_id_emitter, &mut byte_buffer);
                     }
                 }
                 else => break,
@@ -261,10 +253,6 @@ pub async fn spawn_process(
         loop {
             tokio::select! {
                 Some(data) = stdin_rx.recv() => {
-                    if master_writer.write_all(&data).is_err() { break; }
-                    let _ = master_writer.flush();
-                }
-                Some(data) = spoof_rx.recv() => {
                     if master_writer.write_all(&data).is_err() { break; }
                     let _ = master_writer.flush();
                 }
