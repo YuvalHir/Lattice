@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, Show, onMount, onCleanup, JSX, on } from "solid-js";
 import { open } from "@tauri-apps/plugin-dialog";
 import { homeDir } from "@tauri-apps/api/path";
+import { invoke } from "@tauri-apps/api/core";
 import { launchWorkspace, spawnProcess, killProcess, type WorkspaceLaunchItem, PRESETS } from "../services/ipc";
 import type { ExecutionContext } from "../types/schema";
 import {
@@ -93,7 +94,53 @@ export const LauncherModal = (props: LauncherModalProps) => {
   });
 
   const [selectedDir, setSelectedDir] = createSignal<string | null>(null);
+  const [quickCd, setQuickCd] = createSignal("");
+  const [cdError, setCdError] = createSignal(false);
   const [workspaceName, setWorkspaceName] = createSignal("");
+
+  const handleQuickCd = async (e: KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      const val = quickCd().trim();
+      if (val.startsWith('cd ')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const target = val.slice(3).trim();
+        const currentCwd = selectedDir() || '';
+        let nextPath = '';
+        
+        if (target === '..') {
+          const parts = currentCwd.split(/[\\\/]/);
+          if (parts.length > 1) {
+            parts.pop();
+            nextPath = parts.join(currentCwd.includes('/') ? '/' : '\\');
+          }
+        } else if (target.includes(':') || target.startsWith('/')) {
+          nextPath = target;
+        } else {
+          const separator = currentCwd.includes('/') ? '/' : '\\';
+          nextPath = `${currentCwd.replace(/[\\\/]$/, '')}${separator}${target}`;
+        }
+
+        if (nextPath) {
+          try {
+            const exists = await invoke<boolean>('check_directory_exists', { path: nextPath });
+            if (exists) {
+              setSelectedDir(nextPath);
+              setQuickCd('');
+              setCdError(false);
+            } else {
+              setCdError(true);
+              setTimeout(() => setCdError(false), 1000);
+            }
+          } catch (err) {
+            console.error("[LauncherModal] Directory check failed:", err);
+            setCdError(true);
+            setTimeout(() => setCdError(false), 1000);
+          }
+        }
+      }
+    }
+  };
   const [url, setUrl] = createSignal("");
   const [isLaunching, setIsLaunching] = createSignal(false);
   const [sessionCounts, setSessionCounts] = createSignal<SessionCounts>({ ...settingsStore.defaultSessionCounts });
@@ -348,6 +395,9 @@ export const LauncherModal = (props: LauncherModalProps) => {
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter") {
+      // Don't trigger step transition if user is doing a quick cd
+      if (quickCd().trim().startsWith('cd ')) return;
+
       e.preventDefault();
       if (step() === "basics" && selectedDir() && workspaceName()) {
         setStep("swarm");
@@ -396,6 +446,23 @@ export const LauncherModal = (props: LauncherModalProps) => {
                       Browse
                     </button>
                   </div>
+                </div>
+
+                <div class="launcher-input-group quick-cd">
+                  <label class="launcher-label">Quick Navigation</label>
+                  <div class="shell-input-wrapper" classList={{ 'error-shake': cdError() }}>
+                    <span class="shell-prompt">$</span>
+                    <input
+                      type="text"
+                      placeholder="cd folder_name"
+                      value={quickCd()}
+                      onInput={(e) => setQuickCd(e.currentTarget.value)}
+                      onKeyDown={handleQuickCd}
+                    />
+                  </div>
+                  <span class="hint" classList={{ 'error-text': cdError() }}>
+                    {cdError() ? 'Directory not found!' : "Type 'cd ..' or 'cd folder' and press Enter to navigate."}
+                  </span>
                 </div>
               </div>
             </Show>

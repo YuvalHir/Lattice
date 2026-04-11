@@ -171,7 +171,11 @@ function App() {
   return (
     <div class="layout-root" onClick={() => setContextMenu(null)}>
       {/* FULL HEIGHT LEFT SIDEBAR */}
-      <Sidebar onLaunch={() => setIsLauncherOpen(true)} onOpenSettings={() => setIsSettingsOpen(true)} />
+      <Sidebar 
+        onLaunch={() => setIsLauncherOpen(true)} 
+        onGoHome={() => setActiveWorkspace(null)}
+        onOpenSettings={() => setIsSettingsOpen(true)} 
+      />
 
       {/* VERTICAL STACK FOR HEADER + CONTENT */}
       <div class="app-main-stack">
@@ -266,7 +270,7 @@ function App() {
                 )}
               </For>
 
-              <Show when={sessionStore.workspaces.length === 0}>
+              <Show when={sessionStore.workspaces.length === 0 || sessionStore.activeWorkspaceId === null}>
                 <div style={{ display: "flex", "flex-direction": "column", "align-items": "center", "justify-content": "center", height: "100%", background: "var(--bg-app)", padding: "2rem" }}>
                   <div style={{ opacity: 0.1, "margin-bottom": "2rem" }}>
                     <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

@@ -2,6 +2,7 @@ import { sessionStore, toggleServerManager, toggleExplorer } from "../store/sess
 
 interface SidebarProps {
   onLaunch: () => void;
+  onGoHome: () => void;
   onOpenSettings: () => void;
 }
 
@@ -18,9 +19,30 @@ const HexagonLogo = () => (
 export const Sidebar = (props: SidebarProps) => {
   return (
     <aside class="sidebar">
-      <div class="sidebar-logo">
-        <HexagonLogo />
-      </div>
+      <button 
+        class="sidebar-logo-btn" 
+        onClick={props.onGoHome}
+        title="Go to Home"
+        style={{
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          padding: "0",
+          display: "flex",
+          "align-items": "center",
+          "justify-content": "center",
+          width: "100%",
+          height: "48px",
+          "margin-bottom": "0.5rem",
+          transition: "transform 0.2s ease"
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.1)"}
+        onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+      >
+        <div class="sidebar-logo">
+          <HexagonLogo />
+        </div>
+      </button>
       
       <div style={{ display: "flex", "flex-direction": "column", gap: "0.75rem", "align-items": "center" }}>
         {/* PRIMARY ACTION: NEW SESSION */}

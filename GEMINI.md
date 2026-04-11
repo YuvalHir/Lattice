@@ -40,6 +40,11 @@ Lattice is a high-performance, zero-latency multiplexed orchestration environmen
 - **Version Sync**: Versions are managed automatically by **Semantic Release**. Do not bump versions manually in `package.json` or `Cargo.toml`. The CI will analyze commit messages (`feat:`, `fix:`) to determine the next version and keep both files in sync.
 - **CI/CD Alignment**: All performance optimizations and dependency fixes applied to the CI environment MUST be reflected in the `release.yml` to ensure build parity.
 
+## 🔄 Workflow Efficiency
+To avoid merge conflicts with the **Semantic Release Bot**, follow these strategies:
+1. **The Rebase Habit**: Always run `git pull origin main --rebase` before pushing new work. This keeps history linear by placing your commits on top of the Bot's version bumps.
+2. **Feature Branching**: Work on `develop` or feature branches. Merge to `main` only when ready for a release. This ensures the Bot triggers once per "batch" rather than per commit, minimizing sync frequency.
+
 ## 📝 Change Logs & Logging
 - **Deep Logging**: All PTY lifecycle events (Spawn, Read, Emit, Resize, Exit) MUST be printed to the Rust console with the `[WORKSPACE]` or `[PTY]` prefix.
 - **Frontend Debugging**: IPC events and mounting sequences MUST be logged to the browser console with the `[IPC]` or `[TerminalWrapper]` prefix.

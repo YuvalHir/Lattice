@@ -192,7 +192,7 @@ export function updateBrowserUrl(id: string, url: string) {
 /**
  * Switch active workspace.
  */
-export function setActiveWorkspace(id: string) {
+export function setActiveWorkspace(id: string | null) {
   setStore('activeWorkspaceId', id);
 }
 
