@@ -1,0 +1,44 @@
+name: "CI"
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-22.04, windows-latest, macos-latest]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: install frontend dependencies
+        run: npm install
+
+      - name: typecheck frontend
+        run: npx tsc --noEmit
+
+      - name: build frontend
+        run: npm run build
+
+      - name: check Rust
+        working-directory: src-tauri
+        run: cargo check
+
+      - name: clippy Rust
+        working-directory: src-tauri
+        run: cargo clippy -- -D warnings
