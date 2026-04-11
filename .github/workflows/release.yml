@@ -100,6 +100,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Lattice ${{ github.ref_name }}"
+          generateReleaseNotes: true
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
