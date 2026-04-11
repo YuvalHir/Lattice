@@ -1,3 +1,15 @@
+## [0.2.2](https://github.com/YuvalHir/Lattice/compare/v0.2.1...v0.2.2) (2026-04-11)
+
+
+### Bug Fixes
+
+* robust terminal scroll preservation using persistent registry ([8212608](https://github.com/YuvalHir/Lattice/commit/82126088ffd2b8fc0740935f14b63be1fec483b3))
+
+
+### Performance Improvements
+
+* optimize terminal buffer memory and preserve scroll position ([458e8ee](https://github.com/YuvalHir/Lattice/commit/458e8eef7273482fb8edc4d05401ecb3b85123a3))
+
 ## [0.2.1](https://github.com/YuvalHir/Lattice/compare/v0.2.0...v0.2.1) (2026-04-11)
 
 
