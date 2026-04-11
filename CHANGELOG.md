@@ -1,3 +1,10 @@
+## [0.2.1](https://github.com/YuvalHir/Lattice/compare/v0.2.0...v0.2.1) (2026-04-11)
+
+
+### Bug Fixes
+
+* resolve terminal double-pasting and '1;1R' artifacts ([9820a10](https://github.com/YuvalHir/Lattice/commit/9820a10054dd8047dd2e226166713e7765c90cac))
+
 # [0.2.0](https://github.com/YuvalHir/Lattice/compare/v0.1.12...v0.2.0) (2026-04-11)
 
 
