@@ -474,15 +474,16 @@ struct PortOwner {
 pub async fn get_all_services(
     state: State<'_, Arc<Mutex<SessionRegistry>>>,
 ) -> Result<Vec<ServiceInfo>, String> {
-    let mut sys = System::new_all();
-    sys.refresh_all();
+    let mut registry = state.lock().await;
+    // Fast partial refresh for CPU/RAM/Procs
+    registry.sys.refresh_processes(ProcessesToUpdate::All, true);
 
     let mut port_map: std::collections::HashMap<u32, Vec<u16>> = std::collections::HashMap::new();
 
     // Build parent-child mapping once for efficient descendant lookups
     let mut children_map: std::collections::HashMap<Pid, Vec<Pid>> =
         std::collections::HashMap::new();
-    for (&pid, process) in sys.processes() {
+    for (&pid, process) in registry.sys.processes() {
         if let Some(parent) = process.parent() {
             children_map.entry(parent).or_default().push(pid);
         }
@@ -557,7 +558,6 @@ pub async fn get_all_services(
         }
     }
 
-    let registry = state.lock().await;
     let mut services = Vec::new();
     let mut seen_pids = std::collections::HashSet::new();
 
@@ -601,7 +601,7 @@ pub async fn get_all_services(
         significant_ports.sort();
         significant_ports.dedup();
 
-        if let Some(proc) = sys.process(Pid::from_u32(root_pid)) {
+        if let Some(proc) = registry.sys.process(Pid::from_u32(root_pid)) {
             // If the root is a shell but has a Node child, maybe use the child's name?
             // For now, stick to the managed ID/Name.
             services.push(ServiceInfo {
@@ -623,7 +623,7 @@ pub async fn get_all_services(
         }
 
         let sys_pid = Pid::from_u32(pid);
-        if let Some(proc) = sys.process(sys_pid) {
+        if let Some(proc) = registry.sys.process(sys_pid) {
             let exe_path = proc.exe().map(|p| p.to_string_lossy().to_lowercase()).unwrap_or_default();
             let proc_name = proc.name().to_string_lossy().to_lowercase();
 
@@ -886,28 +886,32 @@ pub async fn get_git_log(cwd: String) -> Result<Vec<GitCommit>, String> {
 }
 
 #[tauri::command]
-pub async fn get_memory_usage(workspace_pids: Vec<u32>) -> Result<MemoryUsage, String> {
-    let mut sys = System::new_all();
-    sys.refresh_processes(ProcessesToUpdate::All, true);
+pub async fn get_memory_usage(
+    state: State<'_, Arc<Mutex<SessionRegistry>>>,
+    workspace_pids: Vec<u32>
+) -> Result<MemoryUsage, String> {
+    let mut registry = state.lock().await;
+    // Fast partial refresh for CPU/RAM/Procs
+    registry.sys.refresh_processes(ProcessesToUpdate::All, true);
 
     let current_pid = Pid::from_u32(std::process::id());
 
     // Single pass to build parent-child map for faster lookups
     let mut children_map: std::collections::HashMap<Pid, Vec<Pid>> =
         std::collections::HashMap::new();
-    for (&pid, process) in sys.processes() {
+    for (&pid, process) in registry.sys.processes() {
         if let Some(parent) = process.parent() {
             children_map.entry(parent).or_default().push(pid);
         }
     }
 
     // Total memory: Lattice (current process) and all its descendants
-    let total_bytes = get_memory_recursive(&sys, &children_map, current_pid);
+    let total_bytes = get_memory_recursive(&registry.sys, &children_map, current_pid);
 
     // Workspace memory: Sum of provided root PIDs and their descendants
     let workspace_bytes = workspace_pids
         .iter()
-        .map(|&pid| get_memory_recursive(&sys, &children_map, Pid::from_u32(pid)))
+        .map(|&pid| get_memory_recursive(&registry.sys, &children_map, Pid::from_u32(pid)))
         .sum();
 
     Ok(MemoryUsage {

@@ -203,7 +203,7 @@ export async function launchWorkspace(
   return workspaceId;
 }
 
-export async function writeToStdin(id: string, data: number[]): Promise<void> {
+export async function writeToStdin(id: string, data: Uint8Array | number[]): Promise<void> {
   await invoke<void>('write_to_stdin', { id, data });
 }
 

@@ -33,12 +33,14 @@ pub struct SessionHandle {
 /// The global registry of all active sessions.
 pub struct SessionRegistry {
     pub sessions: HashMap<String, SessionHandle>,
+    pub sys: sysinfo::System,
 }
 
 impl SessionRegistry {
     pub fn new() -> Self {
         Self {
             sessions: HashMap::new(),
+            sys: sysinfo::System::new_all(),
         }
     }
 }

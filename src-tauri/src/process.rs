@@ -73,7 +73,8 @@ pub fn spawn_with_pty(
             #[cfg(not(windows))]
             {
                 let shell = env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
-                (shell, vec!["-lc".to_string()])
+                // Use -c for commands instead of -lc to avoid slow profile sourcing
+                (shell, vec!["-c".to_string()])
             }
         }
         ExecutionContext::PowerShell => (

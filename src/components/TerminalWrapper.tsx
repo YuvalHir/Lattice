@@ -122,6 +122,24 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
     term.loadAddon(fitAddon);
     term.open(terminalElement);
 
+    // Explicitly handle Ctrl+V for pasting and Ctrl+C for copying
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.ctrlKey && e.code === "KeyV" && e.type === "keydown") {
+        navigator.clipboard.readText().then((text) => {
+          term?.paste(text);
+        }).catch(() => {});
+        return false;
+      }
+      if (e.ctrlKey && e.code === "KeyC" && e.type === "keydown") {
+        const selection = term?.getSelection();
+        if (selection && selection.length > 0) {
+          navigator.clipboard.writeText(selection).catch(() => {});
+          return false;
+        }
+      }
+      return true;
+    });
+
     resizeObserver = new ResizeObserver(() => {
       try {
         syncTerminalSize();
@@ -137,9 +155,8 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
     // Bolt ⚡: Reuse TextEncoder instance to prevent unnecessary garbage collection and allocations on every keystroke
     const textEncoder = new TextEncoder();
     const dataListener = term.onData((data) => {
-      const bytes = Array.from(textEncoder.encode(data));
+      const bytes = textEncoder.encode(data);
       writeToStdin(props.id, bytes).catch(console.error);
-      scheduleViewportRecover(40);
     });
 
     const handleWindowFocus = () => scheduleViewportRecover(30);
@@ -182,7 +199,8 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
   createEffect(() => {
     if (props.isActive && fitAddon && term) {
       enableWebglIfNeeded();
-      const recoverDelays = [0, 50, 140, 260];
+      // Reduced delay pass: only two pulses to stabilize layout
+      const recoverDelays = [10, 150];
       recoverDelays.forEach((delay) =>
         setTimeout(() => {
           try {
