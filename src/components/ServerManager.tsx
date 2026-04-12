@@ -14,7 +14,8 @@ import {
   renameExternalService,
   removeSession
 } from '../store/sessionStore';
-import { spawnProcess, getPlatform, type LauncherPreset } from '../services/ipc';
+import { spawnProcess, getPlatform } from '../services/ipc';
+import type { LauncherPreset, ExecutionContext } from '../types/schema';
 import './ServerManager.css';
 
 const ServerManager: Component = () => {

@@ -79,12 +79,6 @@ export const Workspace = (props: WorkspaceProps) => {
       removeSession(newSessionId);
     }
   };
-
-  const handleAdd = () => {
-    // For now, trigger the main launcher. 
-    // In a future update, we could make the launcher "Add-aware"
-    props.onLaunch();
-  };
   
   const getGridDimensions = () => {
     if (sessionStore.zoomedId) {

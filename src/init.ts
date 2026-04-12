@@ -1,7 +1,6 @@
 import { listenToTerminalOutput, listenToProcessExit, getPlatform } from './services/ipc';
 import { appendOutput, terminateSession, sessionStore } from './store/sessionStore';
 import { terminalRegistry } from './components/TerminalWrapper';
-import { settingsStore, updateSettings } from './store/settingsStore';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { ask, message } from '@tauri-apps/plugin-dialog';
