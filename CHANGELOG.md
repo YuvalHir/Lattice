@@ -1,3 +1,10 @@
+## [0.3.1](https://github.com/YuvalHir/Lattice/compare/v0.3.0...v0.3.1) (2026-04-12)
+
+
+### Bug Fixes
+
+* resolve TypeScript errors and unused code in frontend ([489b37e](https://github.com/YuvalHir/Lattice/commit/489b37e600339c5c9dd3c1596c601564ca49b2fd))
+
 # [0.3.0](https://github.com/YuvalHir/Lattice/compare/v0.2.2...v0.3.0) (2026-04-12)
 
 
