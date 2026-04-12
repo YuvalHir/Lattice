@@ -1,3 +1,10 @@
+# [0.3.0](https://github.com/YuvalHir/Lattice/compare/v0.2.2...v0.3.0) (2026-04-12)
+
+
+### Features
+
+* implement cross-platform support and enhance terminal orchestration ([8bc2dcd](https://github.com/YuvalHir/Lattice/commit/8bc2dcd93a357b89f8b0fc3cce598f08dc988f3c))
+
 ## [0.2.2](https://github.com/YuvalHir/Lattice/compare/v0.2.1...v0.2.2) (2026-04-11)
 
 
