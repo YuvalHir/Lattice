@@ -36,6 +36,7 @@ pub fn run() {
             commands::get_git_log,
             commands::get_memory_usage,
             commands::get_all_services,
+            commands::get_platform,
             commands::check_directory_exists,
         ])
 

@@ -6,6 +6,7 @@ use std::error::Error;
 use std::path::Path;
 
 /// Resolves common Windows shell names to their absolute system paths.
+#[cfg(windows)]
 fn resolve_executable_path(cmd: &str) -> String {
     match cmd.to_lowercase().as_str() {
         "cmd" | "cmd.exe" => "C:\\Windows\\System32\\cmd.exe".to_string(),
@@ -18,9 +19,16 @@ fn resolve_executable_path(cmd: &str) -> String {
 }
 
 fn get_home_dir() -> String {
-    env::var("USERPROFILE")
-        .or_else(|_| env::var("HOME"))
-        .unwrap_or_else(|_| "C:\\".to_string())
+    #[cfg(windows)]
+    {
+        env::var("USERPROFILE")
+            .or_else(|_| env::var("HOME"))
+            .unwrap_or_else(|_| "C:\\".to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        env::var("HOME").unwrap_or_else(|_| "/".to_string())
+    }
 }
 
 fn shell_escape_posix(s: &str) -> String {
@@ -36,6 +44,9 @@ fn shell_escape_posix(s: &str) -> String {
 }
 
 fn build_wsl_command(cmd: &str, args: &[String]) -> String {
+    if args.is_empty() {
+        return cmd.to_string();
+    }
     let mut parts = Vec::with_capacity(args.len() + 1);
     parts.push(shell_escape_posix(cmd));
     for arg in args {
@@ -61,40 +72,73 @@ pub fn spawn_with_pty(
         pixel_height: 0,
     })?;
 
-    // 1. Resolve the shell and wrapping arguments based on context
+    // 1. Resolve the shell and wrapping arguments based on context and platform
     let (shell_exe, shell_args) = match context {
         ExecutionContext::Native => {
             #[cfg(windows)]
             {
                 (
-                    "powershell.exe".to_string(),
-                    vec!["-NoLogo".to_string(), "-NoProfile".to_string()],
+                    "cmd.exe".to_string(),
+                    vec!["/C".to_string()],
                 )
             }
             #[cfg(not(windows))]
             {
                 let shell = env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
-                // Use -c for commands instead of -lc to avoid slow profile sourcing
-                (shell, vec!["-c".to_string()])
+                (shell, vec!["-lc".to_string()])
             }
         }
-        ExecutionContext::PowerShell => (
-            "powershell.exe".to_string(),
-            vec!["-NoLogo".to_string(), "-NoProfile".to_string()],
-        ),
-        ExecutionContext::CMD => ("cmd.exe".to_string(), vec!["/C".to_string()]),
-        ExecutionContext::WSL => (
-            "wsl.exe".to_string(),
-            vec!["--".to_string(), "bash".to_string(), "-ilc".to_string()],
-        ),
+        ExecutionContext::PowerShell => {
+            #[cfg(windows)]
+            {
+                (
+                    "powershell.exe".to_string(),
+                    vec![
+                        "-NoLogo".to_string(),
+                        "-ExecutionPolicy".to_string(),
+                        "Bypass".to_string(),
+                    ],
+                )
+            }
+            #[cfg(not(windows))]
+            {
+                // Fallback to system shell if pwsh isn't standard on this system
+                let shell = env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+                (shell, vec!["-lc".to_string()])
+            }
+        }
+        ExecutionContext::CMD => {
+            #[cfg(windows)]
+            {
+                ("cmd.exe".to_string(), vec!["/C".to_string()])
+            }
+            #[cfg(not(windows))]
+            {
+                let shell = env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+                (shell, vec!["-lc".to_string()])
+            }
+        }
+        ExecutionContext::WSL => {
+            #[cfg(windows)]
+            {
+                (
+                    "wsl.exe".to_string(),
+                    vec!["--".to_string(), "bash".to_string(), "-ilc".to_string()],
+                )
+            }
+            #[cfg(not(windows))]
+            {
+                let shell = env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+                (shell, vec!["-lc".to_string()])
+            }
+        }
     };
 
     // 2. Resolve the absolute path for the shell executable (Windows only)
-    let resolved_shell = if shell_exe.ends_with(".exe") || shell_exe.contains("System32") {
-        resolve_executable_path(&shell_exe)
-    } else {
-        shell_exe
-    };
+    #[cfg(windows)]
+    let resolved_shell = resolve_executable_path(&shell_exe);
+    #[cfg(not(windows))]
+    let resolved_shell = shell_exe;
 
     // 3. Verify absolute path existence for core shells on Windows
     #[cfg(windows)]
@@ -110,6 +154,7 @@ pub fn spawn_with_pty(
     }
 
     // 4. Initialize CommandBuilder with the shell
+    println!("[PTY] Initializing builder for: {}", resolved_shell);
     let mut builder = CommandBuilder::new(&resolved_shell);
 
     // Set common environment variables to prevent TTY hangs and enable colors
@@ -121,15 +166,20 @@ pub fn spawn_with_pty(
 
     // 5. Wrap the command
     if !cmd.is_empty() {
-        // Apply shell arguments (like -- or -Command)
+        println!("[PTY] Command detected: '{}' with {} args", cmd, args.len());
+        // Apply shell arguments (like -lc or -NoProfile)
         for arg in &shell_args {
+            println!("[PTY] Adding shell arg: {}", arg);
             builder.arg(arg);
         }
 
         if context == &ExecutionContext::WSL {
-            builder.arg(build_wsl_command(cmd, args));
+            let wsl_cmd = build_wsl_command(cmd, args);
+            println!("[PTY] WSL wrapping: {}", wsl_cmd);
+            builder.arg(wsl_cmd);
         } else {
             let mut full_cmd = cmd.to_string();
+            // Append any additional arguments if they exist
             if !args.is_empty() {
                 for arg in args {
                     full_cmd.push(' ');
@@ -140,25 +190,38 @@ pub fn spawn_with_pty(
             #[cfg(windows)]
             {
                 if context == &ExecutionContext::CMD {
+                    println!("[PTY] CMD wrapping: {}", full_cmd);
                     builder.arg(full_cmd);
                 } else {
+                    // Simpler command execution
+                    println!("[PTY] PowerShell wrapping: {}", full_cmd);
                     builder.arg("-Command");
-                    builder.arg(full_cmd);
+                    builder.arg(&full_cmd);
                 }
             }
             #[cfg(not(windows))]
             {
+                println!("[PTY] Unix wrapping: {}", full_cmd);
                 builder.arg(full_cmd);
             }
         }
+    } else {
+        println!("[PTY] No command provided, spawning interactive shell");
     }
 
     // 6. Set Working Directory
     let final_cwd = working_dir.unwrap_or_else(get_home_dir);
+    println!("[PTY] Working directory: {}", final_cwd);
     builder.cwd(final_cwd);
 
     // 7. Spawn on PTY Slave
-    let child = pair.slave.spawn_command(builder)?;
+    println!("[PTY] Spawning command...");
+    let child = pair.slave.spawn_command(builder).map_err(|e| {
+        println!("[PTY] SPAWN FAILURE: {}", e);
+        e
+    })?;
+
+    println!("[PTY] Spawned successfully with PID {:?}", child.process_id());
 
     Ok((pair, child))
 }

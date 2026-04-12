@@ -297,6 +297,12 @@ body {
   color: var(--text-main);
 }
 
+.tile-action-btn.active {
+  background: var(--accent-primary);
+  color: white;
+  opacity: 1 !important;
+}
+
 .tile-action-btn.danger:hover {
   background: var(--accent-danger, #f85149);
   color: white;

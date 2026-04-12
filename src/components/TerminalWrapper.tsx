@@ -152,11 +152,14 @@ export const TerminalWrapper = (props: TerminalWrapperProps) => {
 
     // Explicitly handle Ctrl+V for pasting and Ctrl+C for copying
     term.attachCustomKeyEventHandler((e) => {
-      if (e.ctrlKey && e.code === "KeyV" && e.type === "keydown") {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const isMod = isMac ? e.metaKey : e.ctrlKey;
+
+      if (isMod && e.code === "KeyV" && e.type === "keydown") {
         // xterm.js handles the native 'paste' event automatically when we return false
         return false;
       }
-      if (e.ctrlKey && e.code === "KeyC" && e.type === "keydown") {
+      if (isMod && e.code === "KeyC" && e.type === "keydown") {
         const selection = term?.getSelection();
         if (selection && selection.length > 0) {
           navigator.clipboard.writeText(selection).catch(() => {});

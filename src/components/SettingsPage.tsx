@@ -12,6 +12,7 @@ import {
 } from "../store/settingsStore";
 import { checkForUpdates } from "../init";
 import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 
 type SettingsCategory = "common" | "appearance" | "terminal" | "sessions" | "shortcuts" | "about";
 
@@ -34,14 +35,17 @@ export const SettingsPage = (props: SettingsPageProps) => {
   const [draft, setDraft] = createSignal<AppSettings>({ ...settingsStore });
   const [appVersion, setAppVersion] = createSignal<string>("...");
   const [isCheckingUpdates, setIsCheckingUpdates] = createSignal(false);
+  const [platform, setPlatform] = createSignal<string>("linux");
 
   createEffect(async () => {
     if (props.isActive) {
       setDraft({ ...settingsStore });
       try {
         setAppVersion(await getVersion());
+        const p = await invoke<string>("get_platform");
+        setPlatform(p);
       } catch (e) {
-        console.error("Failed to get app version:", e);
+        console.error("Failed to get app version or platform:", e);
       }
     }
   });
@@ -228,10 +232,15 @@ export const SettingsPage = (props: SettingsPageProps) => {
             value={draft().defaultShell}
             onChange={(e) => setDraft((prev) => ({ ...prev, defaultShell: e.currentTarget.value as any }))}
           >
-            <option value="PowerShell">PowerShell</option>
-            <option value="CMD">Command Prompt (CMD)</option>
-            <option value="WSL">WSL (Windows Subsystem for Linux)</option>
             <option value="Native">System Default</option>
+            <Show when={platform() === "windows"}>
+              <option value="PowerShell">PowerShell</option>
+              <option value="CMD">Command Prompt (CMD)</option>
+              <option value="WSL">WSL (Windows Subsystem for Linux)</option>
+            </Show>
+            <Show when={platform() !== "windows"}>
+              <option value="PowerShell">PowerShell (pwsh)</option>
+            </Show>
           </select>
         </div>
 
@@ -262,25 +271,27 @@ export const SettingsPage = (props: SettingsPageProps) => {
         <div class="settings-sessions-grid">
           <For each={SESSION_TYPES}>
             {(type) => (
-              <div class="settings-session-item">
-                <div class="settings-session-header">
-                  <span class="settings-session-icon">
-                    {type === "Gemini" && "◇"}
-                    {type === "Claude" && "◆"}
-                    {type === "Codex" && "○"}
-                    {type === "OpenCode" && "□"}
-                    {type === "WSL" && "▤"}
-                    {type === "Browser" && "🌐"}
-                    {type === "Terminal" && "⧉"}
-                  </span>
-                  <span class="settings-session-name">{type}</span>
+              <Show when={type !== "WSL" || platform() === "windows"}>
+                <div class="settings-session-item">
+                  <div class="settings-session-header">
+                    <span class="settings-session-icon">
+                      {type === "Gemini" && "◇"}
+                      {type === "Claude" && "◆"}
+                      {type === "Codex" && "○"}
+                      {type === "OpenCode" && "□"}
+                      {type === "WSL" && "▤"}
+                      {type === "Browser" && "🌐"}
+                      {type === "Terminal" && "⧉"}
+                    </span>
+                    <span class="settings-session-name">{type}</span>
+                  </div>
+                  <div class="settings-session-controls">
+                    <button class="settings-stepper-btn" onClick={() => updateCount(type, -1)}>−</button>
+                    <span class="settings-session-count">{draft().defaultSessionCounts[type]}</span>
+                    <button class="settings-stepper-btn" onClick={() => updateCount(type, 1)}>+</button>
+                  </div>
                 </div>
-                <div class="settings-session-controls">
-                  <button class="settings-stepper-btn" onClick={() => updateCount(type, -1)}>−</button>
-                  <span class="settings-session-count">{draft().defaultSessionCounts[type]}</span>
-                  <button class="settings-stepper-btn" onClick={() => updateCount(type, 1)}>+</button>
-                </div>
-              </div>
+              </Show>
             )}
           </For>
         </div>
@@ -288,42 +299,65 @@ export const SettingsPage = (props: SettingsPageProps) => {
     </div>
   );
 
-  const renderShortcutsSettings = () => (
-    <div class="settings-category-content">
-      <div class="settings-section">
-        <h3 class="settings-section-title">Keyboard Shortcuts</h3>
-        <p class="settings-section-description">Configure keybindings for common actions</p>
+  const renderShortcutsSettings = () => {
+    const isMac = () => platform() === "macos";
+    const mod = () => isMac() ? "Cmd" : "Ctrl";
 
-        <div class="settings-shortcuts-list">
-          <div class="settings-shortcut-item">
-            <span class="settings-shortcut-label">Open Launcher</span>
-            <div class="settings-shortcut-keys">
-              <kbd class="settings-shortcut-key">Ctrl+L</kbd>
-              <span class="settings-shortcut-or">or</span>
-              <kbd class="settings-shortcut-key">Ctrl+N</kbd>
+    return (
+      <div class="settings-category-content">
+        <div class="settings-section">
+          <h3 class="settings-section-title">Keyboard Shortcuts</h3>
+          <p class="settings-section-description">Common actions and their keybindings</p>
+
+          <div class="settings-shortcuts-list">
+            <div class="settings-shortcut-item">
+              <span class="settings-shortcut-label">Open Launcher</span>
+              <div class="settings-shortcut-keys">
+                <kbd class="settings-shortcut-key">{mod()}+L</kbd>
+                <span class="settings-shortcut-or">or</span>
+                <kbd class="settings-shortcut-key">{mod()}+N</kbd>
+              </div>
+            </div>
+            <div class="settings-shortcut-item">
+              <span class="settings-shortcut-label">Toggle Settings</span>
+              <kbd class="settings-shortcut-key">{mod()}+,</kbd>
+            </div>
+            <div class="settings-shortcut-item">
+              <span class="settings-shortcut-label">Close Current Workspace</span>
+              <kbd class="settings-shortcut-key">{mod()}+W</kbd>
+            </div>
+            <div class="settings-shortcut-item">
+              <span class="settings-shortcut-label">Toggle Zoom</span>
+              <div class="settings-shortcut-keys">
+                <kbd class="settings-shortcut-key">{mod()}+Enter</kbd>
+                <Show when={isMac()}>
+                  <span class="settings-shortcut-or">or</span>
+                  <kbd class="settings-shortcut-key">Cmd+Opt+Z</kbd>
+                </Show>
+              </div>
+            </div>
+            <div class="settings-shortcut-item">
+              <span class="settings-shortcut-label">Next Agent</span>
+              <kbd class="settings-shortcut-key">{isMac() ? "Cmd+Opt+Right" : "Ctrl+Right"}</kbd>
+            </div>
+            <div class="settings-shortcut-item">
+              <span class="settings-shortcut-label">Prev Agent</span>
+              <kbd class="settings-shortcut-key">{isMac() ? "Cmd+Opt+Left" : "Ctrl+Left"}</kbd>
+            </div>
+            <div class="settings-shortcut-item">
+              <span class="settings-shortcut-label">Close Modal/Settings</span>
+              <kbd class="settings-shortcut-key">Esc</kbd>
             </div>
           </div>
-          <div class="settings-shortcut-item">
-            <span class="settings-shortcut-label">Toggle Settings</span>
-            <kbd class="settings-shortcut-key">Ctrl+,</kbd>
-          </div>
-          <div class="settings-shortcut-item">
-            <span class="settings-shortcut-label">Close Current Workspace</span>
-            <kbd class="settings-shortcut-key">Ctrl+W</kbd>
-          </div>
-          <div class="settings-shortcut-item">
-            <span class="settings-shortcut-label">Close Modal/Settings</span>
-            <kbd class="settings-shortcut-key">Esc</kbd>
-          </div>
-        </div>
 
-        <div class="settings-note">
-          <span class="settings-note-icon">ℹ</span>
-          <span>Keyboard shortcuts are currently hardcoded. Configurable keybindings coming soon.</span>
+          <div class="settings-note">
+            <span class="settings-note-icon">ℹ</span>
+            <span>Keyboard shortcuts are currently hardcoded. Configurable keybindings coming soon.</span>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderAboutSettings = () => (
     <div class="settings-category-content">

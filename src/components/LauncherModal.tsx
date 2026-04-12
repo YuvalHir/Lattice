@@ -156,10 +156,11 @@ export const LauncherModal = (props: LauncherModalProps) => {
     OpenCode: "Native", 
     WSL: "WSL", 
     Browser: "Native",
-    Terminal: "PowerShell"
+    Terminal: "Native"
   });
   
   const [showAdvanced, setShowAdvanced] = createSignal(false);
+  const [platform, setPlatform] = createSignal<string>("linux");
   
   // Track how many are currently in the process of spawning to prevent duplicates
   const [spawningCounts, setSpawningCounts] = createSignal<Record<SessionType, number>>({
@@ -180,6 +181,13 @@ export const LauncherModal = (props: LauncherModalProps) => {
     setSelectedDir(remembered || home);
     setWorkspaceName(settingsStore.defaultWorkspaceName);
     setUrl(settingsStore.defaultBrowserUrl);
+
+    try {
+      const p = await invoke<string>("get_platform");
+      setPlatform(p);
+    } catch (e) {
+      console.error("[LauncherModal] Failed to get platform:", e);
+    }
   });
 
   // PREDICTIVE LAUNCHING EFFECT
@@ -492,25 +500,29 @@ export const LauncherModal = (props: LauncherModalProps) => {
                   <div class="preset-chip" onClick={() => applyPreset("pair")}>Pair (1+1)</div>
                   <div class="preset-chip" onClick={() => applyPreset("quad")}>Quad (2+2)</div>
                   <div class="preset-chip" onClick={() => applyPreset("browser-heavy")}>Web</div>
-                  <div class="preset-chip" onClick={() => applyPreset("wsl-swarm")}>WSL + Terminal</div>
+                  <Show when={platform() === "windows"}>
+                    <div class="preset-chip" onClick={() => applyPreset("wsl-swarm")}>WSL + Terminal</div>
+                  </Show>
                 </div>
 
                 <div class="agent-selector-palette">
                   <For each={SESSION_TYPES}>
                     {(type) => (
-                      <div 
-                        class={`agent-card-mini ${sessionCounts()[type] > 0 ? 'active' : ''}`}
-                        onClick={() => updateCount(type, 1)}
-                        onContextMenu={(e) => { e.preventDefault(); updateCount(type, -1); }}
-                      >
-                        <Show when={sessionCounts()[type] > 0}>
-                          <div class="agent-badge-count">{sessionCounts()[type]}</div>
-                        </Show>
-                        <div style={{ color: sessionCounts()[type] > 0 ? "var(--accent-primary)" : "var(--text-muted)", transition: "color 0.2s" }}>
-                          {AGENT_ICONS[type]}
+                      <Show when={type !== "WSL" || platform() === "windows"}>
+                        <div 
+                          class={`agent-card-mini ${sessionCounts()[type] > 0 ? 'active' : ''}`}
+                          onClick={() => updateCount(type, 1)}
+                          onContextMenu={(e) => { e.preventDefault(); updateCount(type, -1); }}
+                        >
+                          <Show when={sessionCounts()[type] > 0}>
+                            <div class="agent-badge-count">{sessionCounts()[type]}</div>
+                          </Show>
+                          <div style={{ color: sessionCounts()[type] > 0 ? "var(--accent-primary)" : "var(--text-muted)", transition: "color 0.2s" }}>
+                            {AGENT_ICONS[type]}
+                          </div>
+                          <span style={{ "font-size": "11px", "font-weight": "500" }}>{type}</span>
                         </div>
-                        <span style={{ "font-size": "11px", "font-weight": "500" }}>{type}</span>
-                      </div>
+                      </Show>
                     )}
                   </For>
                 </div>
@@ -559,9 +571,14 @@ export const LauncherModal = (props: LauncherModalProps) => {
                               style={{ background: "#0d1117", border: "1px solid var(--border-main)", color: "var(--text-main)", "font-size": "10px", padding: "2px 4px", "border-radius": "4px" }}
                             >
                               <option value="Native">Global Default</option>
-                              <option value="PowerShell">PowerShell</option>
-                              <option value="CMD">CMD</option>
-                              <option value="WSL">WSL</option>
+                              <Show when={platform() === "windows"}>
+                                <option value="PowerShell">PowerShell</option>
+                                <option value="CMD">CMD</option>
+                                <option value="WSL">WSL</option>
+                              </Show>
+                              <Show when={platform() !== "windows"}>
+                                <option value="PowerShell">PowerShell (pwsh)</option>
+                              </Show>
                             </select>
                           </div>
                         )}

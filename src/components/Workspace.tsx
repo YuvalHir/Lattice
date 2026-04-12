@@ -1,5 +1,15 @@
-import { For, Show, createSignal } from "solid-js";
-import { sessionStore, setActiveSession, renameSession, addSession, addSessionToWorkspace, removeSession, updateSessionPid } from "../store/sessionStore";
+import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { 
+  sessionStore, 
+  setActiveSession, 
+  renameSession, 
+  addSession, 
+  addSessionToWorkspace, 
+  removeSession, 
+  updateSessionPid,
+  toggleZoom,
+  cycleZoom
+} from "../store/sessionStore";
 import { TerminalWrapper } from "./TerminalWrapper";
 import { BrowserPane } from "./BrowserPane";
 import { spawnProcess, closeSession } from "../services/ipc";
@@ -19,6 +29,36 @@ export const Workspace = (props: WorkspaceProps) => {
 
   // Track which session is being edited
   const [editingSessionId, setEditingSessionId] = createSignal<string | null>(null);
+
+  onMount(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if we are in the active workspace
+      if (sessionStore.activeWorkspaceId !== props.workspaceId) return;
+
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modifier = isMac ? e.metaKey : e.ctrlKey;
+
+      // Cycle sessions: 
+      // Windows/Linux: Ctrl + ArrowRight / Ctrl + ArrowLeft
+      // macOS: Cmd + Option + ArrowRight / Cmd + Option + ArrowLeft
+      if (modifier) {
+        if (e.key === 'ArrowRight' && (!isMac || e.altKey)) {
+          e.preventDefault();
+          cycleZoom('next');
+        } else if (e.key === 'ArrowLeft' && (!isMac || e.altKey)) {
+          e.preventDefault();
+          cycleZoom('prev');
+        } else if (e.key === 'Enter' || (e.key === 'z' && e.altKey)) {
+          // Ctrl/Cmd + Enter or Ctrl/Cmd + Alt + Z to toggle zoom
+          e.preventDefault();
+          toggleZoom();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    onCleanup(() => window.removeEventListener('keydown', handleKeyDown));
+  });
 
   const handleSplit = async (sessionId: string) => {
     const session = sessionStore.sessions[sessionId];
@@ -47,7 +87,9 @@ export const Workspace = (props: WorkspaceProps) => {
   };
   
   const getGridDimensions = () => {
-// ... (rest of getGridDimensions)
+    if (sessionStore.zoomedId) {
+      return { cols: 1, rows: 1 };
+    }
     const total = sessionIds().length;
     if (total <= 1) return { cols: 1, rows: 1 };
     if (total <= 2) return { cols: 2, rows: 1 };
@@ -60,8 +102,10 @@ export const Workspace = (props: WorkspaceProps) => {
     return { cols, rows };
   };
 
-  const getGridArea = (index: number) => {
-// ... (rest of getGridArea)
+  const getGridArea = (index: number, sessionId: string) => {
+    if (sessionStore.zoomedId) {
+      return sessionId === sessionStore.zoomedId ? '1 / 1 / 2 / 2' : 'none';
+    }
     const { cols } = getGridDimensions();
     const row = Math.floor(index / cols) + 1;
     const col = (index % cols) + 1;
@@ -69,7 +113,6 @@ export const Workspace = (props: WorkspaceProps) => {
   };
 
   const getGridTemplate = () => {
-// ... (rest of getGridTemplate)
     const { cols, rows } = getGridDimensions();
     return {
       col: `repeat(${cols}, 1fr)`,
@@ -98,19 +141,33 @@ export const Workspace = (props: WorkspaceProps) => {
       <For each={sessionIds()}>
         {(sessionId, index) => (
           <div
-            class={`terminal-tile glass-pane ${sessionStore.activeId === sessionId ? 'glass-pane-active' : ''}`}
+            class={`terminal-tile glass-pane ${sessionStore.activeId === sessionId ? 'glass-pane-active' : ''} ${sessionStore.zoomedId === sessionId ? 'zoomed' : ''}`}
             onMouseDown={() => setActiveSession(sessionId)}
             style={{
-              'grid-area': getGridArea(index()),
+              'grid-area': getGridArea(index(), sessionId),
+              display: sessionStore.zoomedId && sessionStore.zoomedId !== sessionId ? 'none' : 'flex',
+              'flex-direction': 'column',
+              'min-height': 0,
+              'min-width': 0
             }}
           >
-            <div class="tile-header">
+            <div 
+              class="tile-header"
+              onDblClick={(e) => {
+                e.stopPropagation();
+                toggleZoom(sessionId);
+              }}
+            >
               <Show
                 when={editingSessionId() === sessionId}
                 fallback={
                   <div
                     class="tile-header-content"
-                    onDblClick={() => setEditingSessionId(sessionId)}
+                    onDblClick={(e) => {
+                      // Prevent zoom toggle if dblclick was for editing
+                      e.stopPropagation();
+                      setEditingSessionId(sessionId);
+                    }}
                   >
                     <span class="tile-header-name">
                       {sessionStore.sessions[sessionId]?.customName || sessionStore.sessions[sessionId]?.preset.name}
@@ -146,6 +203,15 @@ export const Workspace = (props: WorkspaceProps) => {
 
               <div class="tile-header-actions">
                 <button 
+                  class={`tile-action-btn ${sessionStore.zoomedId === sessionId ? 'active' : ''}`}
+                  title={sessionStore.zoomedId === sessionId ? "Exit Zoom" : "Zoom Agent"}
+                  onClick={(e) => { e.stopPropagation(); toggleZoom(sessionId); }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                  </svg>
+                </button>
+                <button 
                   class="tile-action-btn" 
                   title="Split Agent"
                   onClick={(e) => { e.stopPropagation(); handleSplit(sessionId); }}
@@ -153,16 +219,6 @@ export const Workspace = (props: WorkspaceProps) => {
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                     <line x1="12" y1="3" x2="12" y2="21"></line>
-                  </svg>
-                </button>
-                <button 
-                  class="tile-action-btn" 
-                  title="Add Agent"
-                  onClick={(e) => { e.stopPropagation(); handleAdd(); }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
                   </svg>
                 </button>
                 <button 

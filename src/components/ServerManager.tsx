@@ -11,8 +11,10 @@ import {
   updateSessionPid, 
   stripAnsi, 
   renameSession, 
-  renameExternalService 
+  renameExternalService,
+  removeSession
 } from '../store/sessionStore';
+import { spawnProcess, getPlatform, type LauncherPreset } from '../services/ipc';
 import './ServerManager.css';
 
 const ServerManager: Component = () => {
@@ -20,15 +22,27 @@ const ServerManager: Component = () => {
   const [newName, setNewName] = createSignal('');
   const [newCommand, setNewCommand] = createSignal('');
   const [newCwd, setNewCwd] = createSignal('');
+  const [newContext, setNewContext] = createSignal<ExecutionContext>('Native');
   const [quickCd, setQuickCd] = createSignal('');
   const [cdError, setCdError] = createSignal(false);
   const [viewingLogId, setViewingLogId] = createSignal<string | null>(null);
   const [editingPid, setEditingPid] = createSignal<number | null>(null);
   const [editValue, setEditValue] = createSignal('');
+  const [platform, setPlatform] = createSignal<string>('linux');
 
   onMount(async () => {
     const home = await homeDir();
     setNewCwd(home);
+
+    try {
+      const p = await getPlatform();
+      setPlatform(p);
+      if (p === 'windows') {
+        setNewContext('PowerShell');
+      }
+    } catch (e) {
+      console.error("[ServerManager] Failed to get platform:", e);
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -105,10 +119,11 @@ const ServerManager: Component = () => {
         const target = val.slice(3).trim();
         let nextPath = '';
         if (target === '..') {
+          const separator = platform() === 'windows' ? '\\' : '/';
           const parts = newCwd().split(/[\\\/]/);
           if (parts.length > 1) {
             parts.pop();
-            nextPath = parts.join('\\');
+            nextPath = parts.join(separator);
           }
         } else if (target.includes(':') || target.startsWith('/')) {
           nextPath = target;
@@ -135,18 +150,25 @@ const ServerManager: Component = () => {
   const launchBackgroundService = async () => {
     if (!newCommand() || !newName()) return;
     const id = `bg-${Math.random().toString(36).slice(2, 11)}`;
-    const [executable, ...args] = newCommand().split(' ');
-    const preset = {
+    
+    // Instead of splitting and risking issues with quoted paths/args,
+    // we pass the entire command as the executable and empty args.
+    // The backend shell (-lc or -Command) handles the parsing correctly.
+    const preset: LauncherPreset = {
       id,
       name: newName(),
-      command: { executable, args },
-      context: 'Native' as const,
-      cwd: newCwd() || undefined,
+      command: { 
+        executable: newCommand().trim(), 
+        args: [] 
+      },
+      context: newContext(),
+      cwd: newCwd()?.trim().replace(/[\\\/]+$/, '') || undefined,
       runtime: 'native' as const,
     };
+
     try {
       addSession(id, 0, preset, true);
-      const pid = await invoke<number>('spawn_process', { payload: preset });
+      const pid = await spawnProcess(preset);
       updateSessionPid(id, pid);
       setIsLaunching(false);
       setNewName('');
@@ -155,6 +177,7 @@ const ServerManager: Component = () => {
       setTimeout(poll, 500); 
     } catch (e) {
       console.error('[ServerManager] Launch failed:', e);
+      removeSession(id);
     }
   };
 
@@ -162,9 +185,17 @@ const ServerManager: Component = () => {
     const id = viewingLogId();
     if (!id) return '';
     const session = sessionStore.sessions[id];
-    if (!session || !session.buffer || session.buffer.length === 0) return 'No logs available yet...';
     
-    // Join chunks for display
+    if (!session) {
+      console.warn(`[ServerManager] No session found for ID: ${id}`);
+      return 'Session not found in store.';
+    }
+
+    if (!session.buffer || session.buffer.length === 0) {
+      return 'No logs available yet...';
+    }
+    
+    console.log(`[ServerManager] Displaying ${session.buffer.length} chunks for ${id}`);
     const raw = session.buffer.join('');
     return stripAnsi(raw);
   };
@@ -347,7 +378,10 @@ const ServerManager: Component = () => {
           <div class="log-viewer-overlay" onClick={() => setViewingLogId(null)}>
             <div class="log-viewer-content" onClick={(e) => e.stopPropagation()}>
               <header class="log-viewer-header">
-                <h3>Service Logs: {sessionStore.sessions[viewingLogId()!]?.preset.name}</h3>
+                <div class="header-info">
+                  <h3>Service Logs: {sessionStore.sessions[viewingLogId()!]?.preset.name}</h3>
+                  <span class="log-stat">{sessionStore.sessions[viewingLogId()!]?.buffer.length || 0} chunks</span>
+                </div>
                 <button class="close-btn" onClick={() => setViewingLogId(null)}>✕</button>
               </header>
               <pre class="log-display">
@@ -393,6 +427,27 @@ const ServerManager: Component = () => {
                   onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setIsLaunching(false))}
                 />
               </div>
+
+              <div class="form-group">
+                <label>Environment / Shell</label>
+                <select 
+                  class="context-select"
+                  value={newContext()} 
+                  onChange={(e) => setNewContext(e.currentTarget.value as any)}
+                  style={{ background: "#0d1117", border: "1px solid var(--border-main)", color: "var(--text-main)", "font-size": "13px", padding: "8px", "border-radius": "6px", width: "100%" }}
+                >
+                  <option value="Native">System Default</option>
+                  <Show when={platform() === 'windows'}>
+                    <option value="PowerShell">PowerShell</option>
+                    <option value="CMD">Command Prompt (CMD)</option>
+                    <option value="WSL">WSL (Linux Subsystem)</option>
+                  </Show>
+                  <Show when={platform() !== 'windows'}>
+                    <option value="PowerShell">PowerShell (pwsh)</option>
+                  </Show>
+                </select>
+              </div>
+
               <div class="form-group">
                 <label>Working Directory</label>
                 <div class="dir-input">

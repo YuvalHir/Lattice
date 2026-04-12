@@ -56,6 +56,7 @@ interface SessionStore {
   isSourceControlOpen: boolean;
   isExplorerOpen: boolean;
   isServerManagerOpen: boolean;
+  zoomedId: string | null;
   services: ServiceInfo[];
   externalNames: Record<number, string>; // Custom names for external services by PID
 }
@@ -68,11 +69,48 @@ const [store, setStore] = createStore<SessionStore>({
   isSourceControlOpen: false,
   isExplorerOpen: false,
   isServerManagerOpen: false,
+  zoomedId: null,
   services: [],
   externalNames: {},
 });
 
 export const sessionStore = store;
+
+/**
+ * Toggles the zoom state for a specific session.
+ */
+export function toggleZoom(id: string | null = store.activeId) {
+  if (store.zoomedId === id) {
+    setStore('zoomedId', null);
+  } else {
+    setStore('zoomedId', id);
+    if (id) setStore('activeId', id);
+  }
+}
+
+/**
+ * Cycles to the next or previous session in the current workspace.
+ */
+export function cycleZoom(direction: 'next' | 'prev' = 'next') {
+  const activeWorkspace = store.workspaces.find(w => w.id === store.activeWorkspaceId);
+  if (!activeWorkspace || activeWorkspace.sessionIds.length <= 1) return;
+
+  const currentIds = activeWorkspace.sessionIds;
+  const currentIndex = currentIds.indexOf(store.activeId || '');
+  
+  let nextIndex;
+  if (direction === 'next') {
+    nextIndex = (currentIndex + 1) % currentIds.length;
+  } else {
+    nextIndex = (currentIndex - 1 + currentIds.length) % currentIds.length;
+  }
+
+  const nextId = currentIds[nextIndex];
+  setStore('activeId', nextId);
+  if (store.zoomedId) {
+    setStore('zoomedId', nextId);
+  }
+}
 
 /**
  * Adds a new workspace or adds a session to an existing one.
@@ -211,8 +249,12 @@ export function terminateSession(id: string, exitCode: number | null = null) {
  */
 export function stripAnsi(text: string | string[]): string {
   const combined = Array.isArray(text) ? text.join('') : text;
-  // Common ANSI escape sequence regex
-  return combined.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+  if (!combined) return '';
+  
+  // More comprehensive ANSI escape sequence regex
+  // Handles colors, cursor movements, and other common sequences
+  const ansiRegex = /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
+  return combined.replace(ansiRegex, '');
 }
 
 /**

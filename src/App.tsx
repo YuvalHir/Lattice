@@ -64,35 +64,37 @@ function App() {
     onCleanup(() => clearInterval(interval));
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const isMod = isMac ? e.metaKey : e.ctrlKey;
 
       // Don't trigger shortcuts when typing in inputs
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
 
-      // Ctrl+, to toggle settings
-      if (e.ctrlKey && e.key === ",") {
+      // Ctrl+, or Cmd+, to toggle settings
+      if (isMod && e.key === ",") {
         e.preventDefault();
         setIsSettingsOpen(prev => !prev);
         return;
       }
 
-      // Ctrl+L to open launcher
-      if (e.ctrlKey && e.key === "l") {
+      // Ctrl+L or Cmd+L to open launcher
+      if (isMod && e.key === "l") {
         e.preventDefault();
         setIsLauncherOpen(true);
         return;
       }
 
-      // Ctrl+N to create new workspace (opens launcher)
-      if (e.ctrlKey && e.key === "n") {
+      // Ctrl+N or Cmd+N to create new workspace (opens launcher)
+      if (isMod && e.key === "n") {
         e.preventDefault();
         setIsLauncherOpen(true);
         return;
       }
 
-      // Ctrl+W to close current workspace
-      if (e.ctrlKey && e.key === "w") {
+      // Ctrl+W or Cmd+W to close current workspace
+      if (isMod && e.key === "w") {
         e.preventDefault();
         const activeId = sessionStore.activeWorkspaceId;
         if (activeId) {

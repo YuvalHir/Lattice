@@ -297,7 +297,7 @@ export const defaultSettings: AppSettings = {
   defaultBrowserUrl: "http://localhost:3000",
   rememberLastDirectory: true,
   terminalFontSize: 13,
-  defaultShell: "PowerShell",
+  defaultShell: "Native",
   theme: DEFAULT_THEME_ID,
   defaultSessionCounts: {
     Gemini: 1,

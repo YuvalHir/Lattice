@@ -89,11 +89,15 @@ export const PRESETS: Record<string, LauncherPreset> = {
       args: [],
     },
     runtime: 'native',
-    context: 'PowerShell',
+    context: 'Native',
   },
 };
 
 export type WorkspaceLaunchItem = keyof typeof PRESETS | 'Browser';
+
+export async function getPlatform(): Promise<string> {
+  return await invoke<string>('get_platform');
+}
 
 export async function spawnProcess(preset: LauncherPreset): Promise<number> {
   console.log(`[LAUNCHER] Attempting to spawn process for ${preset.id}...`);

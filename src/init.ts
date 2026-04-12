@@ -1,6 +1,7 @@
-import { listenToTerminalOutput, listenToProcessExit } from './services/ipc';
+import { listenToTerminalOutput, listenToProcessExit, getPlatform } from './services/ipc';
 import { appendOutput, terminateSession, sessionStore } from './store/sessionStore';
 import { terminalRegistry } from './components/TerminalWrapper';
+import { settingsStore, updateSettings } from './store/settingsStore';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { ask, message } from '@tauri-apps/plugin-dialog';
@@ -74,11 +75,22 @@ export async function checkForUpdates(manual = false) {
 export async function initializeApp() {
   console.log('Initializing Multiplexer IPC listeners...');
 
+  try {
+    const platform = await getPlatform();
+    console.log(`[INIT] Running on platform: ${platform}`);
+  } catch (e) {
+    console.error('[INIT] Failed to get platform:', e);
+  }
+
   // Check for updates in the background
   checkForUpdates();
 
   // Start listening for terminal output from the backend
   const unlistenOutput = await listenToTerminalOutput((payload) => {
+    if (payload.id.startsWith('bg-')) {
+       console.log(`[IPC] ${payload.id} raw data: ${JSON.stringify(payload.data)}`);
+    }
+
     // 1. Persist to store for history/catch-up.
     appendOutput(payload.id, payload.data);
 

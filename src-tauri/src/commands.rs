@@ -102,6 +102,7 @@ fn flush_buffer(
     app: &AppHandle,
     id: &str,
     byte_buffer: &mut Vec<u8>,
+    spoof_tx: &mpsc::Sender<Vec<u8>>,
 ) {
     if byte_buffer.is_empty() {
         return;
@@ -142,6 +143,12 @@ fn flush_buffer(
     };
 
     if !to_emit.is_empty() {
+        // TTY-Spoof: Respond to cursor position requests commonly used by shell tools.
+        // If we don't respond, the tool hangs waiting for terminal feedback.
+        if to_emit.contains("\x1b[6n") {
+            let _ = spoof_tx.try_send(b"\x1b[1;1R".to_vec());
+        }
+
         let _ = app.emit(
             "terminal-output",
             TerminalOutputPayload {
@@ -202,6 +209,7 @@ pub async fn spawn_process(
 
     let (stdin_tx, mut stdin_rx) = mpsc::channel::<Vec<u8>>(1024);
     let (output_tx, mut output_rx) = mpsc::channel::<Vec<u8>>(1024);
+    let (spoof_tx, mut spoof_rx) = mpsc::channel::<Vec<u8>>(10);
 
     // 1. Dedicated Reader Thread (Low-latency blocking reads)
     std::thread::spawn(move || {
@@ -222,6 +230,7 @@ pub async fn spawn_process(
     // 2. Throttled Aggregator Task (Runs on Tokio)
     let app_emitter = app.clone();
     let session_id_emitter = session_id.clone();
+    let spoof_tx_clone = spoof_tx.clone();
 
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(20));
@@ -235,12 +244,12 @@ pub async fn spawn_process(
                     byte_buffer.extend(data);
                     // Force flush if buffer is getting huge to prevent extreme latency spikes
                     if byte_buffer.len() > 32768 {
-                        flush_buffer(&app_emitter, &session_id_emitter, &mut byte_buffer);
+                        flush_buffer(&app_emitter, &session_id_emitter, &mut byte_buffer, &spoof_tx_clone);
                     }
                 }
                 _ = interval.tick() => {
                     if !byte_buffer.is_empty() {
-                        flush_buffer(&app_emitter, &session_id_emitter, &mut byte_buffer);
+                        flush_buffer(&app_emitter, &session_id_emitter, &mut byte_buffer, &spoof_tx_clone);
                     }
                 }
                 else => break,
@@ -253,6 +262,10 @@ pub async fn spawn_process(
         loop {
             tokio::select! {
                 Some(data) = stdin_rx.recv() => {
+                    if master_writer.write_all(&data).is_err() { break; }
+                    let _ = master_writer.flush();
+                }
+                Some(data) = spoof_rx.recv() => {
                     if master_writer.write_all(&data).is_err() { break; }
                     let _ = master_writer.flush();
                 }
@@ -460,6 +473,11 @@ struct PortOwner {
 }
 
 #[tauri::command]
+pub async fn get_platform() -> String {
+    std::env::consts::OS.to_string()
+}
+
+#[tauri::command]
 pub async fn get_all_services(
     state: State<'_, Arc<Mutex<SessionRegistry>>>,
 ) -> Result<Vec<ServiceInfo>, String> {
@@ -514,28 +532,64 @@ pub async fn get_all_services(
 
     #[cfg(not(windows))]
     {
-        let output = tokio::process::Command::new("ss")
+        // Try ss first (Linux), then lsof (macOS/Linux)
+        let ss_output = tokio::process::Command::new("ss")
             .args(["-tunlp"])
             .no_window()
             .output()
-            .await
-            .map_err(|e| e.to_string())?;
+            .await;
 
-        if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            for line in stdout.lines().skip(1) {
-                if let Some(pid_start) = line.find("pid=") {
-                    let pid_str: String = line[pid_start + 4..]
-                        .chars()
-                        .take_while(|c| c.is_ascii_digit())
-                        .collect();
-                    if let Ok(pid) = pid_str.parse::<u32>() {
-                        if let Some(addr_start) = line.rfind(" ") {
-                            let part = &line[..addr_start].trim();
-                            if let Some(last_space) = part.rfind(" ") {
-                                let addr = &part[last_space + 1..];
-                                if let Some(port_start) = addr.rfind(":") {
-                                    if let Ok(port) = addr[port_start + 1..].parse::<u16>() {
+        if let Ok(output) = ss_output {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                for line in stdout.lines().skip(1) {
+                    if let Some(pid_start) = line.find("pid=") {
+                        let pid_str: String = line[pid_start + 4..]
+                            .chars()
+                            .take_while(|c| c.is_ascii_digit())
+                            .collect();
+                        if let Ok(pid) = pid_str.parse::<u32>() {
+                            if let Some(addr_start) = line.rfind(" ") {
+                                let part = &line[..addr_start].trim();
+                                if let Some(last_space) = part.rfind(" ") {
+                                    let addr = &part[last_space + 1..];
+                                    if let Some(port_start) = addr.rfind(":") {
+                                        if let Ok(port) = addr[port_start + 1..].parse::<u16>() {
+                                            port_map.entry(pid).or_default().push(port);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // If port_map is still empty, try lsof (common on macOS)
+        if port_map.is_empty() {
+            let lsof_output = tokio::process::Command::new("lsof")
+                .args(["-i", "-P", "-n", "-sTCP:LISTEN"])
+                .no_window()
+                .output()
+                .await;
+
+            if let Ok(output) = lsof_output {
+                if output.status.success() {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    for line in stdout.lines().skip(1) {
+                        let parts: Vec<&str> = line.split_whitespace().collect();
+                        if parts.len() >= 9 {
+                            let pid_str = parts[1];
+                            let addr_port = parts[8];
+                            if let Ok(pid) = pid_str.parse::<u32>() {
+                                if let Some(port_start) = addr_port.rfind(':') {
+                                    if let Ok(port) = addr_port[port_start + 1..].parse::<u16>() {
+                                        port_map.entry(pid).or_default().push(port);
+                                    }
+                                } else if let Some(port_start) = addr_port.rfind('.') {
+                                    // Some lsof versions use . instead of :
+                                    if let Ok(port) = addr_port[port_start + 1..].parse::<u16>() {
                                         port_map.entry(pid).or_default().push(port);
                                     }
                                 }
